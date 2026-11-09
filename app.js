@@ -100,6 +100,9 @@
     updateModeTag();
   }
 
+  // 배경 테마: 초록 그라데이션(기본) 또는 연한 회색
+  function applyBg() { document.documentElement.dataset.bg = settings().bg || 'pro'; }
+
   // ---------- 그리기 도우미 ----------
   function sparkline(arr) {
     if (!arr || arr.length < 3) return '';
@@ -850,7 +853,7 @@
     const busy = !!run.stage;
     const stageName = busy ? (STAGES.find((x) => x.id === run.stage) || {}).name : '';
     const src = state.aiSrc;
-    const fc = b && b['전망'] ? `<div class="fc-chips">${S.FORECASTS.map((f) => { const v = b['전망'][f.key.replace('전망_', '')]; return v ? `<span class="fc ${v === '상승' ? 'up' : v === '하락' ? 'down' : ''}">${esc(f.label.replace(/ (상승|하락)$/, ''))} <b>${esc(v)}</b></span>` : ''; }).join('')}</div>` : '';
+    const fc = b && b['전망'] ? `<div class="fc-grid">${S.FORECASTS.map((f) => { const v = b['전망'][f.key.replace('전망_', '')]; return v ? `<div class="fc-cell"><span>${esc(f.label)}</span><b class="${v === '상승' ? 'up' : v === '하락' ? 'down' : ''}">${v === '상승' ? '▲ ' : v === '하락' ? '▼ ' : ''}${esc(v)}</b></div>` : ''; }).join('')}</div>` : '';
     const sigRows = ['curve', 'stockRate', 'alignment', 'dollar', 'korea', 'phase'].map((k) => sig[k] ? `<li><span class="sg-l">${esc(SIGNAL_TITLES[k])}</span><span class="sg-v ${sig[k].tone}">${esc(sig[k].name)}</span></li>` : '').join('');
     const sv = sig.sectors;
     const meta = `${src ? `${esc(src.source)}${src.at ? ` · ${esc(src.at)}` : ''}${src.model ? ` · ${esc(src.model)}` : ''}` : '아직 오늘 브리핑이 없습니다'}${sig.signalDate ? ` · 미국 ${esc(sig.signalDate)} 종가 기준` : ''}`;
@@ -874,7 +877,7 @@
           <div class="ch-top"><span class="ch-l">오늘의 결론 · AI 센터장</span><span class="ch-warn">교차검증 필요</span></div>
           ${D.headline ? `<p class="ch-head">${esc(D.headline)}</p>` : ''}
           <p class="ch-text">${esc(b['종합 해석'] || '')}</p>
-          <div class="ch-fc"><span class="ch-l">5거래일 전망</span>${fc}</div>
+          <div class="ch-fc"><span class="ch-l">5거래일 뒤 전망</span>${fc}</div>
           <div class="ch-links"><a href="#" data-act="goto-center">토론 전체 보기</a><a href="#" data-act="copy-ai-concl">내 결론 칸에 복사해서 고치기</a></div>
         </section>` : `<section class="card concl-hero empty span-8">
           <span class="ch-l">오늘의 결론</span>
@@ -1610,18 +1613,22 @@
       renderAll(false);
     });
     $('#refreshBtn').addEventListener('click', loadMarket);
+    applyBg();
+    document.addEventListener('change', (e) => { if (e.target.name === 'setBg') document.documentElement.dataset.bg = e.target.value; });
     $('#settingsBtn').addEventListener('click', () => {
       const s = settings();
       $('#setPasscode').value = s.passcode || '';
       $('#setSheetUrl').value = s.sheetUrl || '';
       $('#setMock').checked = !!s.mock;
+      const bg = $(`input[name="setBg"][value="${s.bg || 'pro'}"]`); if (bg) bg.checked = true;
       $('#settingsDialog').showModal();
     });
     $('#settingsDialog').addEventListener('close', () => {
-      if ($('#settingsDialog').returnValue !== 'save') return;
+      if ($('#settingsDialog').returnValue !== 'save') { applyBg(); return; }
       const prev = settings();
-      const s = { passcode: $('#setPasscode').value.trim(), sheetUrl: $('#setSheetUrl').value.trim(), mock: $('#setMock').checked };
+      const s = { passcode: $('#setPasscode').value.trim(), sheetUrl: $('#setSheetUrl').value.trim(), mock: $('#setMock').checked, bg: ($('input[name="setBg"]:checked') || {}).value || 'pro' };
       store.set('md-settings', s);
+      applyBg();
       renderRecordsShell();
       if (prev.mock !== s.mock) loadMarket();
       toast('설정을 저장했습니다', 'ok');

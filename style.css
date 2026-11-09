@@ -676,3 +676,261 @@ table.rec tr.top, table.rec tbody tr:first-child { background: transparent; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* ===== 배경 테마 + 진한 초록 메뉴창 ===== */
+:root {
+  --side-bg: linear-gradient(175deg, #0f4f3a 0%, #0b3d2d 55%, #082e22 100%);
+  --side-ink: rgba(255, 255, 255, .78);
+  --side-dim: rgba(255, 255, 255, .5);
+  --side-hover: rgba(255, 255, 255, .08);
+  --side-field: rgba(255, 255, 255, .1);
+  --side-active: #d9f3e4; --side-active-ink: #0b3d2d;
+}
+html[data-bg="green"] body { background: linear-gradient(150deg, #e4f2ea 0%, #cfe8dc 45%, #b9ddcc 100%); }
+html[data-bg="grey"] body { background: #eef0ee; }
+html[data-bg="green"] { background: #b9ddcc; }
+body { min-height: 100vh; }
+html[data-bg="green"] { --paper-2: #f2f7f4; --line-2: #e6eee9; }
+@media (prefers-color-scheme: dark) {
+  :root { --side-bg: linear-gradient(175deg, #123a2c 0%, #0c281f 100%); --side-active: #7fd3a9; --side-active-ink: #0b2a1f; }
+  html[data-bg="green"] body { background: linear-gradient(150deg, #0e1814 0%, #0f2119 55%, #112a20 100%); }
+  html[data-bg="grey"] body { background: #111412; }
+  html[data-bg="green"] { --paper-2: #1f2521; --line-2: #222925; }
+}
+
+.side { background: var(--side-bg); color: var(--side-ink); box-shadow: 0 10px 30px rgba(8, 46, 34, .18); }
+.brand-title { color: #fff; }
+.brand-sub, .nav-h { color: var(--side-dim); }
+.brand-mark { background: rgba(255, 255, 255, .14); }
+.date-pick { color: var(--side-dim); }
+.date-pick input { background: var(--side-field); color: #fff; color-scheme: dark; }
+.side-btns .btn { background: var(--side-field); color: #fff; border-color: transparent; }
+.side-btns .btn:hover { background: rgba(255, 255, 255, .18); }
+.tab { color: var(--side-ink); }
+.tab:hover { background: var(--side-hover); color: #fff; }
+.tab.active, .tab.active:hover { background: var(--side-active); color: var(--side-active-ink); }
+.nav-group + .nav-group { padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, .1); }
+.side-foot { background: rgba(255, 255, 255, .08); color: var(--side-ink); }
+.side-foot b { color: #bdf0d3; }
+.status-bar.warn { background: rgba(248, 238, 217, .92); }
+.page-head .ph-kicker, .brief-hero .ph-kicker { color: var(--accent); }
+
+/* 설정: 배경 고르기 */
+.bg-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.bg-pick > span { width: 100%; }
+.settings .bg-pick label { flex-direction: row; align-items: center; gap: 7px; font-weight: 600; cursor: pointer; }
+.bg-pick input { width: auto; }
+.sw { width: 22px; height: 22px; border-radius: 7px; border: 1px solid var(--line); display: inline-block; }
+.sw-green { background: linear-gradient(150deg, #e4f2ea, #b9ddcc); }
+.sw-grey { background: #eef0ee; }
+
+@media (max-width: 900px) {
+  .side { border-radius: 0 0 20px 20px; }
+  .nav-group + .nav-group { padding-top: 0; border-top: 0; border-left: 1px solid rgba(255, 255, 255, .15); }
+}
+
+/* ===== 정돈 (색 줄이기 · 선으로 정리) ===== */
+:root {
+  --forest: #10291f;            /* 메뉴창·결론 카드 공통 */
+  --lime: #b9e46c;              /* 포인트는 이 한 색만, 아주 조금 */
+  --side-bg: var(--forest);
+  --hero: var(--forest);
+  --side-active: rgba(255, 255, 255, .09); --side-active-ink: #ffffff;
+  --card-line: #e4e6e1;
+}
+html[data-bg="grey"] body { background: #f1f2ef; }
+html[data-bg="green"] body { background: linear-gradient(180deg, #f1f5f2 0%, #e6eee9 100%); }
+html[data-bg="green"] { background: #e6eee9; }
+.sw-green { background: linear-gradient(180deg, #f1f5f2, #dfe9e3); }
+.sw-grey { background: #f1f2ef; }
+@media (prefers-color-scheme: dark) {
+  :root { --forest: #12261d; --card-line: #252c28; --side-active: rgba(255,255,255,.08); --side-active-ink: #fff; }
+  html[data-bg="grey"] body { background: #0f1210; }
+  html[data-bg="green"] body { background: linear-gradient(180deg, #0f1411, #0e1a14); }
+  .btn.primary { color: #0c1f17; }
+  .tab.active { color: #fff; }
+}
+
+/* 카드: 그림자 대신 얇은 선 */
+.card, .kpi { box-shadow: none; border: 1px solid var(--card-line); }
+.concl-hero { border-color: transparent; }
+
+/* 메뉴창: 단색 + 라임 막대 하나 */
+.side { background: var(--side-bg); box-shadow: none; }
+.brand-mark { background: var(--lime); }
+.brand-mark polyline { stroke: var(--forest); }
+.tab { position: relative; font-weight: 550; }
+.tab.active, .tab.active:hover { background: var(--side-active); color: #fff; font-weight: 700; }
+.tab.active::before { content: ''; position: absolute; left: -14px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: var(--lime); }
+.tab.active .ico { stroke: var(--lime); }
+.side-foot { background: rgba(255, 255, 255, .05); }
+.side-foot b { color: var(--lime); }
+
+/* 버튼: 주 버튼만 진하게 */
+.btn.primary { background: var(--forest); border-color: var(--forest); }
+@media (prefers-color-scheme: dark) { .btn.primary { background: var(--lime); border-color: var(--lime); } }
+
+/* 상태 줄: 조용하게 */
+.status-bar, .status-bar.warn, .status-bar.info, .status-bar.ok { background: transparent; border: 1px dashed var(--card-line); color: var(--ink-3); font-size: 12.5px; padding: 7px 14px; }
+.status-bar.err { background: var(--bad-bg); color: var(--bad); border: 0; }
+
+/* 숫자 카드: 그래프는 회녹색 선만 */
+.kpi-spark polyline { stroke: #6f9a86; stroke-width: 1.4; }
+.kpi-spark polygon { fill: #6f9a86; opacity: .08; }
+.pill { font-size: 11px; padding: 2px 7px; }
+.kpi-l { color: var(--ink-2); }
+
+/* 결론 카드: 빈 공간 없이, 전망은 4칸 */
+.concl-hero { padding: 26px 28px 22px; gap: 12px; }
+.ch-l { color: rgba(255,255,255,.55); }
+.ch-warn { background: rgba(185, 228, 108, .16); color: var(--lime); }
+.ch-head { color: rgba(255,255,255,.6); font-weight: 600; }
+.ch-text { font-size: 20px; line-height: 1.65; }
+.ch-fc { flex-direction: column; align-items: stretch; gap: 10px; border-top-color: rgba(255,255,255,.1); }
+.fc-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.fc-cell { background: rgba(255, 255, 255, .06); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.fc-cell span { font-size: 12px; color: rgba(255,255,255,.55); }
+.fc-cell b { font-size: 15.5px; font-weight: 750; color: #fff; }
+.fc-cell b.up { color: #ff9d92; } .fc-cell b.down { color: #9dbdff; }
+.ch-links a { text-decoration-color: rgba(255,255,255,.25); }
+
+/* 자동 신호: 색 알약 대신 점 + 글자 */
+.sg-v, .sg-v.good, .sg-v.bad, .sg-v.warn, .sg-v.info { background: transparent; padding: 0; color: var(--ink); font-weight: 650; font-size: 13.5px; display: inline-flex; align-items: center; gap: 7px; }
+.sg-v::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); flex: none; }
+.sg-v.good::before { background: var(--good); } .sg-v.bad::before { background: var(--bad); }
+.sg-v.warn::before { background: #d49a2a; } .sg-v.info::before { background: var(--info); }
+
+/* 산업 태그·배지도 한 톤 낮추기 */
+.ind-tag { background: transparent; border: 1px solid var(--card-line); color: var(--ink-2); font-weight: 650; }
+.duel-b { background: transparent; border: 1px solid var(--card-line); }
+.sector2 > div, .report-block, .metric, .tile { background: transparent; border: 1px solid var(--card-line); }
+
+@media (max-width: 640px) {
+  .fc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ch-text { font-size: 17.5px; }
+}
+@media (max-width: 900px) {
+  .tab.active::before { display: none; }
+  .tab.active { background: rgba(255,255,255,.12); }
+}
+
+/* ===== 이화여대 공식 색 (ewha.ac.kr UI 색상 규정) =====
+   이화그린 #00462A · 연두 #BCC924 · 민트 #36AE92 · 배꽃 #FFFDF1 · 그레이 #B9B9B9 */
+:root {
+  --ewha-green: #00462a;
+  --ewha-yg: #bcc924;
+  --ewha-mint: #36ae92;
+  --ewha-pear: #fffdf1;
+  --forest: var(--ewha-green);
+  --lime: var(--ewha-yg);
+  --accent: var(--ewha-green);
+  --accent-2: #2a9a80;          /* 민트를 글자용으로 살짝 진하게 */
+  --accent-soft: #e3f1ec;
+  --good: #00703f; --good-bg: #e2f2ea;
+}
+html[data-bg="grey"] body { background: #f2f3f1; }
+html[data-bg="green"] body { background: linear-gradient(180deg, #f1f6f3 0%, #e1ece6 100%); }
+html[data-bg="green"] { background: #e1ece6; }
+.sw-green { background: linear-gradient(180deg, #f1f6f3, #d9e8e0); }
+@media (prefers-color-scheme: dark) {
+  :root { --forest: #0a3322; --accent: #6fcfb3; --accent-2: #5ec2a6; --accent-soft: #143127; --good: #6fd3a3; }
+}
+.side { background: linear-gradient(180deg, #00502f 0%, var(--ewha-green) 100%); }
+@media (prefers-color-scheme: dark) { .side { background: var(--forest); } }
+.kpi-spark polyline { stroke: var(--ewha-mint); }
+.kpi-spark polygon { fill: var(--ewha-mint); opacity: .09; }
+.ph-kicker { color: var(--ewha-mint) !important; }
+.co-mini-name { color: var(--accent); }
+.ch-warn { background: rgba(188, 201, 36, .18); color: #dbe36a; }
+.side-foot b { color: #d3dc5a; }
+.tab.active .ico { stroke: var(--ewha-yg); }
+
+/* 회색 배경: 레퍼런스처럼 살짝 푸른 쿨그레이로 한 톤 진하게 → 흰 카드가 또렷하게 뜸 */
+html[data-bg="grey"] body { background: #e7eaed; }
+html[data-bg="grey"] { background: #e7eaed; --card-line: transparent; --paper-2: #f5f6f7; }
+html[data-bg="grey"] .duel-b, html[data-bg="grey"] .sector2 > div, html[data-bg="grey"] .report-block,
+html[data-bg="grey"] .metric, html[data-bg="grey"] .tile, html[data-bg="grey"] .ind-tag { border-color: #e4e7ea; }
+html[data-bg="grey"] .status-bar { border-color: #cdd2d7; }
+.sw-grey { background: #e7eaed; }
+@media (prefers-color-scheme: dark) {
+  html[data-bg="grey"] body, html[data-bg="grey"] { background: #0f1113; }
+  html[data-bg="grey"] { --card-line: #23282c; }
+}
+
+/* 회색 배경 한 톤 밝게 */
+html[data-bg="grey"] body, html[data-bg="grey"] { background: #eff1f4; }
+html[data-bg="grey"] { --card-line: #e8ebee; }
+.sw-grey { background: #eff1f4; }
+@media (prefers-color-scheme: dark) {
+  html[data-bg="grey"] body, html[data-bg="grey"] { background: #0f1113; }
+  html[data-bg="grey"] { --card-line: #23282c; }
+}
+
+/* ===== 이화 팔레트 (추천 색 조합) =====
+   모든 색을 이화 공식 팔레트에서 가져옴: 이화그린(바탕 축) · 민트(데이터 선) · 코랄(상승) · 블루(하락).
+   연두는 쓰지 않고, 강조는 결론 카드 하나에만. */
+html[data-bg="pro"] {
+  --bg: #f1f3f1;
+  --ink: #14211b; --ink-2: #47544d; --ink-3: #87918b;
+  --forest: #00462a; --hero: #00462a;
+  --accent: #00462a; --accent-2: #24907a; --accent-soft: #e4f3ee;
+  --mint: #36ae92;
+  --up: #d9503f;   --up-bg: #fdebe8;      /* 이화 코랄을 글자용으로 진하게 */
+  --down: #2a7d9e; --down-bg: #e2f1f6;    /* 이화 블루를 글자용으로 진하게 */
+  --good: #1d8a6f; --good-bg: #e2f3ee;
+  --bad: #c94a3b;  --bad-bg: #fcebe8;
+  --warn: #8a7a12; --warn-bg: #f4f2d8;
+  --info: #2a7d9e; --info-bg: #e2f1f6;
+  --card-line: #e6e9e6; --paper-2: #f6f8f7; --line-2: #edf0ed;
+  background: #f1f3f1;
+}
+html[data-bg="pro"] body { background: #f1f3f1; }
+.sw-pro { background: linear-gradient(135deg, #00462a 0 50%, #36ae92 50% 75%, #f27367 75%); border: 0; }
+
+/* 메뉴창: 이화그린 단색, 선택된 메뉴는 흰 알약 */
+html[data-bg="pro"] .side { background: #00462a; }
+html[data-bg="pro"] .brand-mark { background: #fff; }
+html[data-bg="pro"] .brand-mark polyline { stroke: #00462a; }
+html[data-bg="pro"] .tab.active, html[data-bg="pro"] .tab.active:hover { background: #fff; color: #00462a; }
+html[data-bg="pro"] .tab.active::before { display: none; }
+html[data-bg="pro"] .tab.active .ico { stroke: #00462a; }
+html[data-bg="pro"] .side-foot { background: rgba(255,255,255,.07); }
+html[data-bg="pro"] .side-foot b { color: #8fe0c9; }
+
+/* 버튼 */
+html[data-bg="pro"] .btn.primary { background: #00462a; border-color: #00462a; color: #fff; }
+
+/* 결론 카드: 오른쪽 위에서 민트 빛이 살짝 번지는 한 장면 */
+html[data-bg="pro"] .concl-hero {
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(54, 174, 146, .38) 0%, rgba(54, 174, 146, 0) 55%),
+    #00462a;
+}
+html[data-bg="pro"] .ch-warn { background: rgba(255,255,255,.12); color: #fff; }
+html[data-bg="pro"] .fc-cell { background: rgba(255,255,255,.08); }
+html[data-bg="pro"] .fc-cell b.up { color: #ffaa9f; }
+html[data-bg="pro"] .fc-cell b.down { color: #9ed8ec; }
+
+/* 데이터 선은 민트 */
+html[data-bg="pro"] .kpi-spark polyline { stroke: var(--mint); stroke-width: 1.5; }
+html[data-bg="pro"] .kpi-spark polygon { fill: var(--mint); opacity: .1; }
+html[data-bg="pro"] .spark polyline { stroke: var(--mint); }
+html[data-bg="pro"] .ph-kicker { color: var(--accent-2) !important; }
+html[data-bg="pro"] .ind-tag { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+html[data-bg="pro"] .sg-v.warn::before { background: #bcc924; }
+
+@media (prefers-color-scheme: dark) {
+  html[data-bg="pro"] {
+    --bg: #0e1311; --ink: #e8eeeb; --ink-2: #b3bdb8; --ink-3: #7f8a85;
+    --accent: #6fd0b6; --accent-2: #5cc3a7; --accent-soft: #143329;
+    --up: #ff8a7d; --up-bg: #3a201c; --down: #7cc6e2; --down-bg: #15303b;
+    --good: #6fd0b6; --good-bg: #143329; --bad: #ff8a7d; --bad-bg: #3a201c;
+    --warn: #d6dd6a; --warn-bg: #2e2f17; --info: #7cc6e2; --info-bg: #15303b;
+    --card-line: #232a27; --paper-2: #1d2420; --line-2: #222926;
+    background: #0e1311;
+  }
+  html[data-bg="pro"] body { background: #0e1311; }
+  html[data-bg="pro"] .side { background: #0a2f20; }
+  html[data-bg="pro"] .concl-hero { background: radial-gradient(120% 90% at 100% 0%, rgba(54,174,146,.28) 0%, rgba(54,174,146,0) 55%), #0a2f20; }
+  html[data-bg="pro"] .btn.primary { background: #36ae92; border-color: #36ae92; color: #06251a; }
+}

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-bg="pro">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -109,6 +109,11 @@
       <label>구글 시트 주소 (기록 탭의 '시트 열기' 버튼용)
         <input type="url" id="setSheetUrl" placeholder="https://docs.google.com/spreadsheets/..." />
       </label>
+      <div class="bg-pick"><span>색 조합</span>
+        <label><input type="radio" name="setBg" value="pro" /><i class="sw sw-pro"></i>이화 팔레트 (추천)</label>
+        <label><input type="radio" name="setBg" value="grey" /><i class="sw sw-grey"></i>회색 + 연두 포인트</label>
+        <label><input type="radio" name="setBg" value="green" /><i class="sw sw-green"></i>초록 배경 + 연두 포인트</label>
+      </div>
       <label class="inline"><input type="checkbox" id="setMock" /> 목업 데이터로 보기 (화면 테스트용)</label>
       <div class="dialog-actions">
         <button class="btn" value="cancel">닫기</button>
