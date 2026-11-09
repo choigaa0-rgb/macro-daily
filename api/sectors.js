@@ -30,13 +30,14 @@ async function usSectors() {
       const { rows: h } = await yahooChart(s.etf, '1mo');
       if (h.length < 7) throw new Error('자료 부족');
       const last = h[h.length - 1], prev = h[h.length - 2], wk = h[h.length - 6];
-      return { ...s, date: last.date, close: r2(last.close), d1: r2((last.close / prev.close - 1) * 100), w1: r2((last.close / wk.close - 1) * 100) };
+      return { ...s, date: last.date, weekBase: wk.date, close: r2(last.close), d1: r2((last.close / prev.close - 1) * 100), w1: r2((last.close / wk.close - 1) * 100) };
     } catch (e) { return { ...s, error: e.message }; }
   }));
   const ok = rows.filter((r) => !r.error);
   if (!ok.length) return { ok: false, error: 'Yahoo Finance에서 섹터 ETF를 받지 못했습니다', rows: [] };
   const date = ok.map((r) => r.date).sort().pop();
-  return { ok: true, source: 'Yahoo Finance · SPDR 섹터 ETF', date, rows: ok, failed: rows.filter((r) => r.error).map((r) => r.etf) };
+  const weekBase = (ok.find((r) => r.date === date) || {}).weekBase;
+  return { ok: true, source: 'Yahoo Finance · SPDR 섹터 ETF', date, weekBase, rows: ok, failed: rows.filter((r) => r.error).map((r) => r.etf) };
 }
 
 // ---------- 한국: KRX Open API ----------

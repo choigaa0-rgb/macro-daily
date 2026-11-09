@@ -198,7 +198,7 @@
       ? `<p class="muted small">한국 업종 등락은 KRX Open API 키가 있어야 자동으로 나옵니다. <b>openapi.krx.co.kr</b>에서 인증키를 받고 '코스피 시리즈 일별시세정보' 이용 신청을 한 뒤, Vercel 환경변수 <code>KRX_API_KEY</code>에 넣으세요. 그 전에는 ${link}에서 직접 확인하세요.</p>`
       : `<p class="err small">${esc(S0.error || '불러오지 못했습니다')}</p>`;
     else body = sectorBars(S0.rows, key, kind === 'us' ? (r) => r.ko : (r) => r.name);
-    const meta = S0 && S0.ok ? `${esc(S0.date || '')}${S0.date ? `(${'일월화수목금토'[new Date(S0.date + 'T00:00:00Z').getUTCDay()]})` : ''} 종가${key === 'w1' && S0.weekBase ? ` · ${esc(S0.weekBase)} 대비` : ''}` : '';
+    const meta = S0 && S0.ok ? `${esc(S0.date || '')}${S0.date ? `(${'일월화수목금토'[new Date(S0.date + 'T00:00:00Z').getUTCDay()]})` : ''} 종가${key === 'w1' && S0.weekBase ? ` · ${esc(S0.weekBase)} 종가 대비 5거래일` : ''}` : '';
     return `<div class="sec-panel"><div class="sp-head"><b>${title}</b><span class="muted small">${meta}</span></div>${body}
       <div class="sp-foot muted small">${S0 && S0.ok ? esc(S0.source) + ' · ' : ''}원자료 ${link}${kind === 'us' ? '<br>정규장 종가 기준이에요. Finviz는 미국 장 전·장중에 오늘 실시간 등락을 보여주고, 섹터 안 모든 종목으로 계산해서 숫자가 다를 수 있어요.' : ''}</div></div>`;
   }
