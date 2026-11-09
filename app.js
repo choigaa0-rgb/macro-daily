@@ -85,12 +85,19 @@
   }
   function saveDraft() {
     const d = collect($('#view-daily'));
-    Object.assign(d, collect($('#view-event')));
+    Object.assign(d, collect($('#view-event')), collect($('#view-brief')));
+    d.__aiConcl = state.aiConcl || null;
+    d.__aiSrc = state.aiSrc || null;
+    d.__cmpMatch = state.cmpMatch || '';
     d.__ai = state.aiText;
     d.__cmp = state.cmpText || '';
+    d.__mode = state.authorMode || '';
+    d.__debate = state.debate || null;
+    d.__snap = state.briefSnap || '';
     store.set(draftKey(), d);
     store.set(weekKey(), collect($('#view-weekly')));
     updateProgress();
+    updateModeTag();
   }
 
   // ---------- 그리기 도우미 ----------
@@ -244,6 +251,12 @@
       <div class="card concl">
         <div class="concl-head"><h2>오늘의 결론</h2><button class="btn mini ghost" id="toggleGuides" type="button">${guidesOpen() ? '가이드 모두 접기' : '가이드 모두 펴기'}</button></div>
         <p class="hint">1~8을 확인한 뒤, AI를 보기 전에 <b>내 결론부터</b> 씁니다. 각 칸의 가이드는 오늘 데이터에 맞춰 바뀝니다.</p>
+        <div class="brief-box">
+          <div><b>바쁜 날은 빠른 브리핑</b> <span class="mode-tag" id="modeTag"></span>
+            <div class="muted">AI가 결론 칸과 전망을 채웁니다. 시트에 'AI 브리핑'으로 기록돼 직접 쓴 날과 따로 집계됩니다.</div></div>
+          <button class="btn" id="briefBtn" type="button">⚡ AI 빠른 브리핑</button>
+        </div>
+        <div id="debateSummary"></div>
 
         <div class="fld wide"><span>① 오늘의 동인 — 무엇이 시장을 움직였나</span>
           ${guide('g1', '가이드: 가장 크게 움직인 것 찾기')}
@@ -263,12 +276,23 @@
 
         <div class="fld wide"><span>⑤ 기존 뷰 대비</span>
           ${guide('g5', '가이드: 지난 결론과 비교하기')}
-          <div class="seg">${['유지', '강화', '약화', '수정'].map((o) => `<label><input type="radio" name="view" value="${o}" /><span>${o}</span></label>`).join('')}</div>
-          <input type="hidden" data-key="뷰 변화" id="viewHidden" /></div>
+          <div class="seg" title="고른 버튼을 한 번 더 누르면 선택이 취소됩니다">${['유지', '강화', '약화', '수정'].map((o) => `<label><input type="radio" name="view" value="${o}" /><span>${o}</span></label>`).join('')}</div>
+          <input type="hidden" data-key="뷰 변화" id="viewHidden" />
+          <span class="seg-hint">고른 버튼을 한 번 더 누르면 선택이 취소됩니다.</span></div>
 
         <div class="fld wide"><span>⑥ 다음 체크포인트</span>
           ${guide('g6', '가이드: 내 해석을 확인해줄 다음 이벤트')}
           <input type="text" data-key="다음 체크포인트" placeholder="[이벤트] — [이렇게 나오면 뷰 강화 / 저렇게 나오면 수정]" /></div>
+
+        <div class="fld wide"><span>⑦ 다음 5거래일 전망</span>
+          ${guide('g8', '가이드: 전망 쓰는 법과 채점 기준')}
+          <div class="fc-grid">${S.FORECASTS.map((f) => `<label class="fld"><span>${esc(f.label)} <em class="muted">보합 ${esc(f.unitText)}</em></span>
+            <select data-key="${esc(f.key)}">${['', '상승', '보합', '하락'].map((o) => `<option value="${o}">${o || '전망 안 함'}</option>`).join('')}</select></label>`).join('')}</div>
+          <input type="text" data-key="전망 근거" placeholder="전망 근거 한 줄 (예: 인하 기대 후퇴로 금리 상방, 원화 약세 지속)" /></div>
+
+        <div class="fld wide"><span>⑧ 투자 시사점</span>
+          ${guide('g9', '가이드: 오늘 매크로가 유리·불리하게 만든 섹터')}
+          <input type="text" data-key="투자 시사점" placeholder="[유리한 섹터] — [이유] / [불리한 섹터] — [이유]" /></div>
 
         <div class="fld wide"><span>종합 해석 (3~5문장)</span>
           ${guide('g7', '가이드: ①~⑥을 문장으로 잇기')}
@@ -280,21 +304,7 @@
           <div class="ai-out" id="aiOut"><span class="muted">아직 분석하지 않았습니다.</span></div>
         </div>
 
-        <div class="report-block">
-          <h3>증권사 리포트와 비교</h3>
-          <ol class="steps">
-            <li><a href="https://consensus.hankyung.com/analysis/list?skinType=market" target="_blank" rel="noopener">한경컨센서스 시장 리포트 ↗</a>에서 오늘 날짜의 데일리·시황 리포트를 하나 고릅니다.</li>
-            <li>PDF를 내려받아 아래에 올리거나, 핵심 부분을 복사해 붙여넣습니다.</li>
-            <li><b>AI로 비교하기</b>를 누르면 내 결론과 비교해 정리해 줍니다.</li>
-          </ol>
-          <label class="fld wide"><span>참고 리포트</span><input type="text" data-key="참고 리포트" placeholder="증권사 · 리포트 제목" /></label>
-          <div class="fld wide"><span>리포트 PDF (3MB 이하)</span>
-            <div class="file-row"><input type="file" id="reportFile" accept="application/pdf" /><button class="btn ghost" id="clearFile" type="button">지우기</button></div></div>
-          <label class="fld wide"><span>또는 리포트 내용 붙여넣기</span><textarea id="reportText" rows="4" placeholder="리포트의 결론·전망 부분을 붙여넣으세요. (붙여넣은 원문은 시트에 저장하지 않습니다)"></textarea></label>
-          <button class="btn block-soft" id="compareBtn" type="button">AI로 비교하기</button>
-          <div class="ai-out" id="cmpOut"><span class="muted">리포트를 올리고 비교를 누르세요.</span></div>
-          <label class="fld wide"><span>리포트 비교 메모 (내 말로 정리)</span><textarea data-key="리포트 비교 메모" rows="3" placeholder="같은 점 / 다른 점 / 리포트만의 인사이트 / 내가 놓친 것 / 내가 더 깊게 본 것"></textarea></label>
-        </div>
+        <p class="hint">증권사 리포트와의 교차검증은 <a href="#" data-act="goto-brief">오늘의 브리핑</a> 탭에서 합니다.</p>
 
         <button class="btn primary block" id="saveDaily">구글 시트에 저장</button>
         <div class="save-note" id="saveNote">같은 날짜로 다시 저장하면 그날 기록을 덮어씁니다.</div>
@@ -437,6 +447,32 @@
       <p>한국은 <b>외국인 순매수 지속 여부</b>, <b>수출 데이터(매월 1일·11일·21일경)</b>, 금통위를 함께 봅니다.</p>
       <p>형식: [이벤트] — [이렇게 나오면 뷰 강화 / 저렇게 나오면 수정] · <a href="https://kr.investing.com/economic-calendar/" target="_blank" rel="noopener">경제 캘린더 ↗</a></p>`;
 
+    // ⑦ 전망
+    const mine = state.scored ? state.scored.sum : null;
+    $('#g8').innerHTML = `
+      <p>지금 정보로 <b>5거래일 뒤</b> 각 지표가 오를지, 내릴지, 비슷할지 고릅니다. 모르면 "전망 안 함"으로 두세요.</p>
+      <table class="g-table">
+        <tr><th>채점</th><td>점검일 <b>직전 거래일 종가</b> → 그로부터 <b>5거래일 뒤 종가</b> 변화로 자동 채점 (기록 탭)</td></tr>
+        <tr><th>보합</th><td>${S.FORECASTS.map((f) => `${esc(f.label)} ${esc(f.unitText)}`).join(' · ')} 안이면 보합</td></tr>
+      </table>
+      ${items ? `<p class="muted">참고: 지난 5거래일 변화 — ${S.FORECASTS.map((f) => { const x = items[f.id]; return x && x.ok && x.chg5 != null ? `${esc(f.label)} ${signed(x.chg5, x.chgUnit === 'bp' ? 1 : 2, x.chgUnit === 'bp' ? 'bp' : '%')}` : null; }).filter(Boolean).join(' · ')}</p>` : ''}
+      ${mine && mine.all.total ? `<p>내 적중률: <b>${pct(mine.all)}</b> (${mine.all.hit}/${mine.all.total}) ${S.FORECASTS.map((f) => mine.byAsset[f.key].total ? `· ${esc(f.label)} ${pct(mine.byAsset[f.key])}` : '').join(' ')}</p>` : '<p class="muted">기록 탭에서 불러오기를 하면 내 적중률이 여기 보입니다.</p>'}
+      <p>근거는 ①~④에서 쓴 이야기와 이어지게 씁니다. 예: "물가 이야기 → 금리 상승·원화 약세".</p>`;
+
+    // ⑧ 투자 시사점
+    const sv = sig.sectors;
+    const krSect = fieldVal('업종 상위·하위');
+    const row = (x) => `<tr><th>${esc(x.sector)}</th><td>${esc(x.why.join(' · '))}</td></tr>`;
+    $('#g9').innerHTML = sv ? `
+      <p>오늘 신호로 본 <b>교과서적 연결</b>입니다. 실제 업종 움직임과 비교해서 맞는지 확인하세요.</p>
+      ${sv.fav.length ? `<p><b class="t-bull">유리</b></p><table class="g-table">${sv.fav.map(row).join('')}</table>` : ''}
+      ${sv.unfav.length ? `<p><b class="t-bear">불리</b></p><table class="g-table">${sv.unfav.map(row).join('')}</table>` : ''}
+      ${sv.mixed.length ? `<p class="muted">엇갈림: ${sv.mixed.map((x) => `${esc(x.sector)} (유리: ${esc(x.fav.join(', '))} / 불리: ${esc(x.unfav.join(', '))})`).join(' · ')}</p>` : ''}
+      ${!sv.fav.length && !sv.unfav.length ? '<p class="muted">오늘은 섹터로 이어질 만큼 뚜렷한 신호가 없습니다.</p>' : ''}
+      <p><b>실제 한국 업종</b> ${krSect ? esc(krSect) : '<span class="muted">08 한국 전이의 "업종 상위·하위"를 입력하면 여기서 비교합니다.</span>'}</p>
+      <p>매크로대로 움직였으면 "매크로 주도", 다르게 움직였으면 "업종 고유 이슈"일 가능성이 큽니다. 이 차이가 좋은 분석 포인트예요.</p>
+      <button class="btn mini" data-act="fill-sector" type="button">유리·불리 섹터 넣기</button>` : noData;
+
     // 종합 해석
     $('#g7').innerHTML = `
       <ol>
@@ -457,6 +493,13 @@
     } else if (act === 'apply-story') { setField('이야기', val); renderGuides(); }
     else if (act === 'apply-phase') setField('국면 판단', val);
     else if (act === 'fill-korea') setField('한국 영향', `${state.krFacts} — 이유: `);
+    else if (act === 'fill-sector') {
+      const sv = (state.signals || {}).sectors;
+      if (!sv) return;
+      const f = sv.fav.slice(0, 2).map((x) => x.sector).join(', ');
+      const u = sv.unfav.slice(0, 2).map((x) => x.sector).join(', ');
+      setField('투자 시사점', [f && `유리: ${f}`, u && `불리: ${u}`].filter(Boolean).join(' / ') + ' — 이유: ');
+    }
     else if (act === 'fill-summary') {
       // 아직 안 채운 '— 원인:' 같은 꼬리표와 끝 마침표는 빼고 문장으로 잇기
       const f = (k, d) => (fieldVal(k).replace(/\s*—\s*(원인|이유):\s*$/, '').replace(/[.\s]+$/, '')) || d;
@@ -466,20 +509,533 @@
         `이는 ${f('이야기', '[이야기]')} 쪽 이야기로 보이며, 근거는 ${basis || '[자산 움직임]'}이다. ` +
         `한국은 ${f('한국 영향', '[한국 전이]')}. ` +
         `국면은 ${f('국면 판단', '[국면]')}으로 기울었고, 기존 뷰는 ${f('뷰 변화', '[유지/강화/약화/수정]')}한다. ` +
+        (fieldVal('투자 시사점') ? `투자 측면에서는 ${f('투자 시사점', '')}. ` : '') +
         `다음은 ${f('다음 체크포인트', '[체크포인트]')}로 확인한다.`;
       if (fieldVal('종합 해석') && !confirm('종합 해석에 이미 쓴 내용이 있어요. 틀로 바꿀까요?')) return;
       setField('종합 해석', text);
     }
   }
 
+
+  // ---------- AI 리서치센터 (TradingAgents 구조를 매크로에 적용) ----------
+  const STAGES = [
+    { id: 'analyst', name: '애널리스트 팀' },
+    { id: 'open', name: '첫 발언' },
+    { id: 'rebut', name: '반박' },
+    { id: 'risk', name: '리스크 팀' },
+    { id: 'chief', name: '센터장' },
+  ];
+  const ANALYSTS = [
+    { id: 'rate', mark: '금', name: 'RATE', role: '금리 애널리스트' },
+    { id: 'fx', mark: '환', name: 'FX', role: '달러·원자재 애널리스트' },
+    { id: 'eq', mark: '주', name: 'EQUITY', role: '주식·심리 애널리스트' },
+    { id: 'kr', mark: '한', name: 'KOREA', role: '한국 애널리스트' },
+  ];
+
+  function analystReports() {
+    if (!state.market) return null;
+    const items = state.market.items;
+    const A = S.align(items).items;
+    const sig = state.signals || {};
+    const one = (src, id) => {
+      const x = src[id];
+      if (!x || !x.ok) return null;
+      const def = C.indicators[id] || { label: id, digits: 2 };
+      const u = x.chgUnit === 'bp' ? 'bp' : x.chgUnit === '%' ? '%' : x.chgUnit;
+      return `${def.label} ${num(x.value, def.digits)} (${signed(x.chg, x.chgUnit === 'bp' ? 1 : 2, u)})`;
+    };
+    const sigLine = (k) => (sig[k] ? `${SIGNAL_TITLES[k]}: ${sig[k].name} — ${sig[k].meaning}` : null);
+    const d = collect($('#view-daily'));
+    const manual = (k) => (d[k] ? `${k}: ${d[k]}` : null);
+    const reps = {
+      rate: [one(A, 'us2y'), one(A, 'us10y'), one(A, 't10y2y'), sigLine('curve'), sigLine('decompose'), manual('다음 FOMC 인하 확률(%)'), manual('인하 확률 전일 대비(%p)')],
+      fx: [one(A, 'dxy'), one(items, 'usdkrw'), sigLine('dollar'), one(A, 'wti'), one(A, 'brent'), one(A, 'wtibrent'), one(A, 'gold'), one(A, 'copper')],
+      eq: [one(A, 'dow'), one(A, 'spx'), one(A, 'ndx'), one(A, 'rut'), one(A, 'sox'), sigLine('alignment'), sigLine('stockRate'), one(A, 'vix'), sigLine('hy'), manual('초과 상승 섹터'), manual('초과 하락 섹터')],
+      kr: [one(items, 'kospi'), one(items, 'kosdaq'), one(items, 'kr3y'), one(items, 'kr10y'), items.krus10y && items.krus10y.ok ? `한미 10년물 금리차 ${items.krus10y.value}bp` : null, sigLine('korea'), manual('외국인 순매수 KOSPI(억원)'), manual('업종 상위·하위')],
+    };
+    Object.keys(reps).forEach((k) => { reps[k] = reps[k].filter(Boolean); });
+    return reps;
+  }
+  function analystText() {
+    const r = analystReports();
+    if (!r) return '';
+    const sig = state.signals || {};
+    return (sig.signalDate ? `신호 기준일: 미국 ${sig.signalDate} 종가\n` : '') +
+      ANALYSTS.map((a) => `[${a.name} · ${a.role}]\n${r[a.id].map((l) => `- ${l}`).join('\n')}`).join('\n\n') +
+      (sig.sectors && S.sectorText(sig.sectors) ? `\n\n[섹터 연결 (규칙 기반)]\n${S.sectorText(sig.sectors)}` : '');
+  }
+  function debateSummaryText(d) {
+    if (!d || !d.open) return '';
+    const L = [];
+    const side = (n, x) => { if (x) L.push(`${n}: ${x.claim || ''}`); };
+    side('BULL', d.open.bull); side('BEAR', d.open.bear);
+    if (d.rebut) {
+      if (d.rebut.bull) L.push(`BULL 반박: ${d.rebut.bull.rebuttal || ''}`);
+      if (d.rebut.bear) L.push(`BEAR 반박: ${d.rebut.bear.rebuttal || ''}`);
+    }
+    if (d.risk) L.push(`리스크 팀: ${d.risk.balance || ''} — ${d.risk.reason || ''} (쟁점: ${d.risk.key_issue || ''})`);
+    return L.join('\n');
+  }
+  const fcChips = (fc) => (fc ? `<div class="fc-chips">${S.FORECASTS.map((f) => {
+    const v = fc[f.key.replace('전망_', '')];
+    return v ? `<span class="chip ${v === '상승' ? 'bad' : v === '하락' ? 'info' : ''}">${esc(f.label)} ${esc(v)}</span>` : '';
+  }).join('')}</div>` : '');
+
+  function renderCenter() {
+    const box = $('#centerPanel');
+    if (!box) return;
+    const D = state.debate || {};
+    const reps = analystReports();
+    const run = state.debateRun || {};
+    const stageDone = { analyst: !!D.analystAt, open: !!D.open, rebut: !!D.rebut, risk: !!D.risk, chief: !!D.chiefAt };
+    const status = (id) => (run.stage === id ? 'run' : stageDone[id] ? 'done' : 'wait');
+    const chip = (st, run, done) => `<span class="st st-${st}">${st === 'run' ? run : st === 'done' ? done : '대기'}</span>`;
+    const model = (k) => (D.models && D.models[k] ? `<span class="model-tag">${esc(D.models[k])}</span>` : '');
+    const err = run.error ? `<div class="err">${esc(run.error)} <button class="btn mini" data-act="debate-resume" type="button">이 단계부터 다시</button></div>` : '';
+
+    const side = (who, cls, o, rb) => `
+      <div class="agent debater ${cls}">
+        <div class="ag-head"><span class="ag-mark">${who === 'BULL' ? '↑' : '↓'}</span><div><b>${who}</b><div class="muted">${who === 'BULL' ? '낙관론 연구원' : '비관론 연구원'}</div></div>${chip(run.stage === 'open' || (run.stage === 'rebut' && o) ? 'run' : o ? 'done' : 'wait', run.stage === 'rebut' ? '반박 준비 중…' : '발언 준비 중…', rb ? '반박 완료' : '발언 완료')}</div>
+        ${o ? `<p class="claim">${esc(o.claim || '')}</p>
+          <ol class="pts">${(o.points || []).map((p) => `<li>${esc(p)}</li>`).join('')}</ol>
+          ${o.korea ? `<p class="kr"><b>한국</b> ${esc(o.korea)}</p>` : ''}
+          ${fcChips(o.forecast)}` : '<p class="muted">토론을 시작하면 발언합니다.</p>'}
+        ${rb ? `<div class="bubble"><b>반박</b> ${esc(rb.rebuttal || '')}</div><div class="bubble soft"><b>인정</b> ${esc(rb.concede || '')}</div>` : ''}
+      </div>`;
+
+    box.innerHTML = `
+      <div class="card center-hero">
+        <div class="wk-head"><div><h2>AI 리서치센터</h2>
+          <p class="hint">TradingAgents(Xiao et al., 2024)의 조직 구조를 데일리 매크로에 맞게 옮겼습니다. 애널리스트 보고서 → 강세·약세 토론 → 리스크 팀 평가를 본 뒤, <b>센터장인 내가</b> 결론을 씁니다.</p></div>
+          <div class="rec-actions"><button class="btn primary" id="debateStart" type="button" ${run.stage ? 'disabled' : ''}>${D.open ? '처음부터 다시' : '토론 시작'}</button></div></div>
+        <ol class="stage-bar">${STAGES.map((st) => `<li class="${status(st.id)}">${esc(st.name)}</li>`).join('')}</ol>
+        ${D.auto ? `<p class="auto-note">아침 자동 브리핑에서 불러온 토론입니다${D.models && D.models.morning ? ` (${esc(D.models.morning)})` : ''}. 바로 센터장 결론으로 넘어가면 됩니다.</p>` : ''}
+        ${!D.open && !run.stage ? `<div class="auto-load"><span>${state.morningMsg ? esc(state.morningMsg) : '평일 아침 7~8시에 자동으로 토론이 만들어집니다.'}</span><button class="btn" data-act="load-morning" type="button">오늘 아침 자동 토론 불러오기</button></div>` : ''}
+        ${err}
+      </div>
+
+      <h3 class="center-h">1. 애널리스트 팀 <span class="muted">규칙 기반 자동 신호 · AI 호출 없음</span></h3>
+      <div class="agents4">${ANALYSTS.map((a, i) => {
+        const shown = D.analystAt || (run.stage === 'analyst' && (run.shown || 0) > i);
+        const st = run.stage === 'analyst' ? ((run.shown || 0) > i ? 'done' : 'run') : D.analystAt ? 'done' : 'wait';
+        return `<div class="agent">
+          <div class="ag-head"><span class="ag-mark">${a.mark}</span><div><b>${a.name}</b><div class="muted">${a.role}</div></div>${chip(st, '분석 중…', '보고서 완료')}</div>
+          ${shown && reps ? `<ul class="rep">${reps[a.id].map((l) => `<li>${esc(l)}</li>`).join('') || '<li class="muted">데이터 없음</li>'}</ul>` : '<p class="muted">대기 중</p>'}
+        </div>`; }).join('')}</div>
+
+      <h3 class="center-h">2. 리서치 팀 토론 ${model('open')} ${model('rebut')}</h3>
+      <div class="debate">
+        ${side('BULL', 'bull', D.open && D.open.bull, D.rebut && D.rebut.bull)}
+        <div class="vs">VS</div>
+        ${side('BEAR', 'bear', D.open && D.open.bear, D.rebut && D.rebut.bear)}
+      </div>
+
+      <h3 class="center-h">3. 리스크 팀 ${model('risk')}</h3>
+      <div class="agent risk">
+        <div class="ag-head"><span class="ag-mark">R</span><div><b>RISK</b><div class="muted">중립 평가 · 판단이 뒤집힐 조건</div></div>${chip(status('risk'), '평가 중…', '평가 완료')}</div>
+        ${D.risk ? `
+          <p class="claim"><span class="badge ${D.risk.balance === 'BULL 우세' ? 'good' : D.risk.balance === 'BEAR 우세' ? 'bad' : 'neutral'}">${esc(D.risk.balance || '')}</span> ${esc(D.risk.reason || '')}</p>
+          <p><b>핵심 쟁점</b> ${esc(D.risk.key_issue || '')}</p>
+          <div class="wrong2"><div><b>BULL이 틀렸다고 볼 신호</b><p>${esc(D.risk.bull_wrong_if || '')}</p></div><div><b>BEAR가 틀렸다고 볼 신호</b><p>${esc(D.risk.bear_wrong_if || '')}</p></div></div>
+          ${(D.risk.scenarios || []).length ? `<table class="g-table"><tr><th>시나리오</th><th>계기</th><th>예상 반응</th></tr>${D.risk.scenarios.map((x) => `<tr><td><b>${esc(x.name || '')}</b></td><td>${esc(x.trigger || '')}</td><td>${esc(x.reaction || '')}</td></tr>`).join('')}</table>` : ''}
+          ${(D.risk.checkpoints || []).length ? `<p><b>다음 확인</b> ${D.risk.checkpoints.map(esc).join(' · ')}</p>` : ''}` : '<p class="muted">토론이 끝나면 평가합니다.</p>'}
+      </div>
+
+      <h3 class="center-h">4. 센터장</h3>
+      <div class="agent chief">
+        <p>토론을 다 들었으면 이제 <b>내가 센터장</b>으로 결론을 씁니다. BULL과 BEAR 중 무엇을 받아들이고 무엇을 남겨둘지 정하세요.</p>
+        <div class="chief-actions">
+          <button class="btn primary" data-act="goto-conclusion" type="button" ${D.risk ? '' : 'disabled'}>내가 결론 쓰기 →</button>
+          <button class="btn" data-act="ai-chief" type="button" ${D.risk && !run.stage ? '' : 'disabled'}>${run.stage === 'chief' ? 'AI 센터장 작성 중…' : 'AI 센터장 결론 만들기'}</button>
+        </div>
+        <p class="muted">AI 센터장 결론은 '오늘의 브리핑' 탭에 표시되고, 내 결론과는 따로 저장돼 출처별 적중률로 비교됩니다.</p>
+      </div>`;
+    renderDebateSummary();
+  }
+
+  function renderDebateSummary() {
+    const box = $('#debateSummary');
+    if (!box) return;
+    const D = state.debate || {};
+    if (!D.open) { box.innerHTML = ''; return; }
+    box.innerHTML = `<details class="guide debate-sum" open><summary>AI 리서치센터 토론 요약</summary><div class="g-body">
+      <p><b class="t-bull">BULL</b> ${esc(D.open.bull ? D.open.bull.claim : '')}</p>
+      <p><b class="t-bear">BEAR</b> ${esc(D.open.bear ? D.open.bear.claim : '')}</p>
+      ${D.risk ? `<p><b>리스크 팀</b> ${esc(D.risk.balance || '')} · 쟁점: ${esc(D.risk.key_issue || '')}</p>` : ''}
+      <button class="btn mini" data-act="goto-center" type="button">토론 전체 보기</button></div></details>`;
+  }
+
+  async function debateCall(stage) {
+    const d = collect($('#view-daily'));
+    const prev = previousRecord();
+    const j = await api('/api/debate', { method: 'POST', body: JSON.stringify({
+      stage, date: state.date, analystText: analystText(), dataText: dataText(), manualText: manualText(d),
+      previousText: prev ? `${prev.date}: 뷰 ${prev.rec['뷰 변화'] || '-'}, ${prev.rec['종합 해석'] || prev.rec['오늘의 동인'] || ''}` : '',
+      debate: state.debate,
+    }) });
+    state.debate.models = Object.assign({}, state.debate.models, { [stage]: j.model });
+    return j.data;
+  }
+
+  async function runDebate(fromStage) {
+    if (!state.market) { toast('시장 데이터를 먼저 불러와 주세요', 'err'); return; }
+    const order = ['analyst', 'open', 'rebut', 'risk'];
+    let start = fromStage ? order.indexOf(fromStage) : 0;
+    if (start < 0) start = 0;
+    if (start === 0) state.debate = { models: {} };
+    state.debateRun = {};
+    try {
+      for (let i = start; i < order.length; i++) {
+        const st = order[i];
+        state.debateRun = { stage: st, shown: 0 };
+        renderCenter(); renderBrief();
+        if (st === 'analyst') {
+          for (let k = 1; k <= ANALYSTS.length; k++) {
+            await new Promise((r) => setTimeout(r, 350));
+            state.debateRun.shown = k;
+            renderCenter();
+          }
+          state.debate.analystAt = new Date().toISOString();
+        } else {
+          state.debate[st] = await debateCall(st);
+        }
+        saveDraft();
+      }
+      state.debateRun = {};
+      toast('토론이 끝났습니다. 이제 센터장으로 결론을 쓰세요', 'ok');
+    } catch (e) {
+      state.debateRun = { error: `${STAGES.find((x) => x.id === state.debateRun.stage).name} 단계 실패: ${e.message}`, failed: state.debateRun.stage };
+    }
+    renderCenter(); renderBrief();
+  }
+
+  async function runChief() {
+    state.debateRun = { stage: 'chief' };
+    renderCenter(); renderBrief();
+    try {
+      const b = await debateCall('chief');
+      state.debate.chiefAt = new Date().toISOString();
+      state.debateRun = {};
+      state.aiConcl = b || {};
+      state.aiSrc = { source: '지금 생성', at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }), model: (state.debate.models || {}).chief || '' };
+      saveDraft();
+      toast('AI 센터장 결론이 나왔습니다. 오늘의 브리핑에서 확인하세요', 'ok');
+    } catch (e) {
+      state.debateRun = { error: `센터장 단계 실패: ${e.message}`, failed: 'chief' };
+    }
+    renderCenter(); renderBrief();
+  }
+
+  // 아침 자동 브리핑(시트 '자동 브리핑' 탭)에서 오늘 토론 불러오기
+  async function loadMorning(silent) {
+    try {
+      const j = await api('/api/history?sheet=' + encodeURIComponent('자동 브리핑') + '&limit=10');
+      const row = (j.rows || []).find((r) => r['날짜'] === state.date);
+      if (!row || !row['토론 JSON']) {
+        state.morningMsg = row ? `오늘 아침 브리핑은 있지만 AI 토론이 없습니다 (${row['AI 오류'] || '오류'}). 토론 시작을 눌러 직접 만들 수 있어요.` : `${state.date} 아침 자동 브리핑이 아직 없습니다.`;
+        if (!silent) toast(state.morningMsg, 'err');
+      } else {
+        state.debate = JSON.parse(row['토론 JSON']);
+        if (row['AI 결론 JSON']) {
+          state.aiConcl = JSON.parse(row['AI 결론 JSON']);
+          state.aiSrc = { source: '아침 자동', at: row['생성시각'] || '', model: row['모델'] || '' };
+        }
+        state.morningMsg = '';
+        saveDraft();
+        if (!silent) toast('오늘 아침 자동 토론을 불러왔습니다', 'ok');
+      }
+    } catch (e) {
+      state.morningMsg = '';
+      if (!silent) toast(e.message, 'err');
+    }
+    renderCenter(); renderBrief();
+  }
+
+  function gotoTab(name) {
+    const t = $(`.tab[data-tab="${name}"]`);
+    if (t) t.click();
+  }
+
+
+  // ---------- 오늘의 브리핑 (읽기 중심 + 교차검증) ----------
+  const CONCL_ROWS = ['오늘의 동인', '이야기', '한국 영향', '국면 판단', '뷰 변화', '다음 체크포인트', '투자 시사점'];
+  function aiConclText() {
+    const b = state.aiConcl;
+    if (!b) return '';
+    const L = CONCL_ROWS.concat(['종합 해석']).filter((k) => b[k]).map((k) => `${k}: ${b[k]}`);
+    if (b['전망']) L.push(`5거래일 전망: ${Object.entries(b['전망']).map(([k, v]) => `${k} ${v}`).join(', ')}`);
+    return L.join('\n');
+  }
+  // AI가 쓴 모든 문장 (결론 + 토론) — 숫자 대조용
+  function aiAllText() {
+    const parts = [aiConclText()];
+    const D = state.debate || {};
+    ['bull', 'bear'].forEach((k) => { const x = D.open && D.open[k]; if (x) parts.push(x.claim, ...(x.points || []), x.korea); });
+    if (D.rebut) ['bull', 'bear'].forEach((k) => { const x = D.rebut[k]; if (x) parts.push(x.rebuttal, x.concede); });
+    if (D.risk) parts.push(D.risk.reason, D.risk.key_issue, D.risk.bull_wrong_if, D.risk.bear_wrong_if);
+    return parts.filter(Boolean).join('\n');
+  }
+  function verifyNow() {
+    if (!state.market) return null;
+    const list = S.verifyClaims(aiAllText(), state.market.items);
+    const n = (st) => list.filter((x) => x.status === st).length;
+    return { list, ok: n('일치'), bad: n('불일치'), na: list.length - n('일치') - n('불일치') };
+  }
+
+  function renderBriefShell() {
+    $('#briefPanel').innerHTML = `
+      <div id="briefBody"></div>
+      <div class="card" id="crossCard">
+        <h2>교차검증</h2>
+        <p class="hint">AI 분석은 틀릴 수 있습니다. 세 가지로 확인해서 결론의 정확도를 높입니다.</p>
+        <div id="crossAuto"></div>
+        <div class="report-block cross-report">
+          <h3>② 증권사 리포트와 대조</h3>
+          <ol class="steps">
+            <li><a href="https://consensus.hankyung.com/analysis/list?skinType=market" target="_blank" rel="noopener">한경컨센서스 시장 리포트 ↗</a>에서 오늘 날짜의 데일리·시황 리포트를 하나 고릅니다.</li>
+            <li>PDF를 올리거나 핵심 부분을 붙여넣고 <b>AI로 교차검증</b>을 누르면, 오늘의 결론과 일치도·다른 점·숫자 차이·보완 제안을 정리합니다.</li>
+          </ol>
+          <label class="fld wide"><span>참고 리포트</span><input type="text" data-key="참고 리포트" placeholder="증권사 · 리포트 제목" /></label>
+          <div class="fld wide"><span>리포트 PDF (3MB 이하)</span>
+            <div class="file-row"><input type="file" id="reportFile" accept="application/pdf" /><button class="btn ghost" id="clearFile" type="button">지우기</button></div></div>
+          <label class="fld wide"><span>또는 리포트 내용 붙여넣기</span><textarea id="reportText" rows="3" placeholder="리포트의 결론·전망 부분 (원문은 저장하지 않습니다)"></textarea></label>
+          <button class="btn block-soft" id="compareBtn" type="button">AI로 교차검증</button>
+          <div class="ai-out" id="cmpOut"><span class="muted">리포트를 올리고 교차검증을 누르세요.</span></div>
+          <label class="fld wide"><span>교차검증 메모</span><textarea data-key="리포트 비교 메모" rows="2" placeholder="받아들일 점 / 고칠 점"></textarea></label>
+        </div>
+        <div id="crossScore"></div>
+        <button class="btn primary block" id="saveBrief" type="button">오늘 브리핑 시트에 저장</button>
+        <div class="save-note" id="saveNoteBrief">AI 결론·전망·교차검증 결과가 그날 기록에 함께 저장돼 나중에 적중률이 채점됩니다.</div>
+      </div>`;
+  }
+
+  function renderBrief() {
+    const body = $('#briefBody');
+    if (!body) return;
+    const b = state.aiConcl;
+    const D = state.debate || {};
+    const sig = state.signals || {};
+    const run = state.debateRun || {};
+    const busy = !!run.stage;
+    const stageName = busy ? (STAGES.find((x) => x.id === run.stage) || {}).name : '';
+    const src = state.aiSrc;
+    const fc = b && b['전망'] ? `<div class="fc-chips">${S.FORECASTS.map((f) => { const v = b['전망'][f.key.replace('전망_', '')]; return v ? `<span class="chip ${v === '상승' ? 'bad' : v === '하락' ? 'info' : ''}">${esc(f.label)} ${esc(v)}</span>` : ''; }).join('')}</div>` : '';
+    const chips = ['curve', 'stockRate', 'alignment', 'dollar', 'korea', 'phase'].map((k) => sig[k] ? `<span class="chip ${sig[k].tone}"><b>${esc(SIGNAL_TITLES[k])}</b> ${esc(sig[k].name)}</span>` : '').join('');
+    const sv = sig.sectors;
+    body.innerHTML = `
+      <div class="card brief-hero">
+        <div class="wk-head"><div>
+          <div class="brief-date">${esc(state.date)} 아침 브리핑</div>
+          <div class="muted">${src ? `${esc(src.source)}${src.at ? ` · ${esc(src.at)}` : ''}${src.model ? ` · ${esc(src.model)}` : ''}` : '아직 오늘 브리핑이 없습니다'}${sig.signalDate ? ` · 미국 ${esc(sig.signalDate)} 종가 기준` : ''}</div>
+        </div>
+        <div class="rec-actions">
+          <button class="btn" data-act="load-morning" type="button" ${busy ? 'disabled' : ''}>아침 브리핑 불러오기</button>
+          <button class="btn primary" id="briefMake" type="button" ${busy ? 'disabled' : ''}>${busy ? `${esc(stageName)} 진행 중…` : b ? '다시 만들기' : '지금 브리핑 만들기'}</button>
+        </div></div>
+        ${run.error ? `<div class="err">${esc(run.error)} <button class="btn mini" data-act="debate-resume" type="button">이 단계부터 다시</button></div>` : ''}
+        ${state.morningMsg && !b ? `<p class="muted">${esc(state.morningMsg)}</p>` : ''}
+        ${D.headline ? `<p class="headline">${esc(D.headline)}</p>` : ''}
+        <div class="chips">${chips}</div>
+      </div>
+
+      ${b ? `<div class="card brief-concl">
+        <div class="wk-head"><h2>오늘의 결론 <span class="muted">AI 센터장</span></h2><span class="ai-warn">AI 분석 · 교차검증 필요</span></div>
+        <p class="concl-text">${esc(b['종합 해석'] || '')}</p>
+        <table class="g-table concl-tbl">${CONCL_ROWS.filter((k) => b[k]).map((k) => `<tr><th>${esc(k)}</th><td>${esc(b[k])}</td></tr>`).join('')}</table>
+        <p class="muted" style="margin:8px 0 2px">5거래일 전망</p>${fc}
+        <div class="brief-links"><a href="#" data-act="goto-center">토론 전체 보기 →</a> <a href="#" data-act="copy-ai-concl">내 결론 칸에 복사해서 고치기 →</a></div>
+      </div>` : `<div class="card"><p class="muted">평일 아침 7~8시에 자동으로 만들어집니다. 지금 바로 보려면 <b>지금 브리핑 만들기</b>를 누르세요 (데이터 → 토론 → 결론, 1~2분).</p></div>`}
+
+      ${D.open ? `<div class="card"><h2>BULL vs BEAR <span class="muted">${D.risk ? `리스크 팀: ${esc(D.risk.balance || '')}` : ''}</span></h2>
+        <div class="bb2"><div><b class="t-bull">BULL</b> ${esc(D.open.bull ? D.open.bull.claim : '')}</div><div><b class="t-bear">BEAR</b> ${esc(D.open.bear ? D.open.bear.claim : '')}</div></div>
+        ${D.risk ? `<p><b>핵심 쟁점</b> ${esc(D.risk.key_issue || '')}</p><p class="muted">BULL이 틀렸다고 볼 신호: ${esc(D.risk.bull_wrong_if || '')} · BEAR가 틀렸다고 볼 신호: ${esc(D.risk.bear_wrong_if || '')}</p>` : ''}
+      </div>` : ''}
+
+      ${state.industry ? `<div class="card"><div class="wk-head"><h2>산업 이슈 <span class="muted">${esc(state.industry.headline || '')}</span></h2><a href="#" data-act="goto-industry">전체 보기 →</a></div>
+        <ul class="mini-list">${state.industry.issues.slice(0, 4).map((it) => `<li><span class="ind-tag">${esc(it.industry)}</span> ${esc(it.title)} <span class="badge ${IMPACT_TONE[it.impact] || 'neutral'}">${esc(it.impact || '')}</span></li>`).join('')}</ul></div>` : ''}
+      ${state.company ? `<div class="card"><div class="wk-head"><h2>오늘의 기업 <span class="muted">${esc(state.company.data.company.name)}</span></h2><a href="#" data-act="goto-company">카드 보기 →</a></div>
+        <p>${esc((state.company.card || {}).one_liner || '')}</p><p class="muted">${esc(state.company.reason || '')}</p></div>` : ''}
+
+      ${sv && (sv.fav.length || sv.unfav.length) ? `<div class="card"><h2>섹터 시사점 <span class="muted">규칙 기반</span></h2>
+        ${sv.fav.length ? `<p><b class="t-bull">유리</b> ${sv.fav.map((x) => `${esc(x.sector)} <span class="muted">(${esc(x.why.join(', '))})</span>`).join(' · ')}</p>` : ''}
+        ${sv.unfav.length ? `<p><b class="t-bear">불리</b> ${sv.unfav.map((x) => `${esc(x.sector)} <span class="muted">(${esc(x.why.join(', '))})</span>`).join(' · ')}</p>` : ''}
+      </div>` : ''}`;
+    renderCross();
+  }
+
+  function renderCross() {
+    const box = $('#crossAuto');
+    if (!box) return;
+    const v = state.aiConcl || (state.debate && state.debate.open) ? verifyNow() : null;
+    box.innerHTML = `<h3>① 데이터 대조 <span class="muted">AI 문장 속 숫자 ↔ 실제 데이터 (자동)</span></h3>
+      ${!v ? '<p class="muted">AI 브리핑이 나오면 자동으로 대조합니다.</p>' : !v.list.length ? '<p class="muted">대조할 숫자를 찾지 못했습니다.</p>' : `
+        <p><span class="badge ${v.bad ? 'bad' : 'good'}">${v.bad ? `불일치 ${v.bad}건` : '모두 일치'}</span> 숫자 ${v.list.length}개 중 일치 ${v.ok} · 불일치 ${v.bad}${v.na ? ` · 확인 불가 ${v.na}` : ''}</p>
+        ${v.bad ? `<table class="g-table">${v.list.filter((x) => x.status === '불일치').map((x) => `<tr><th class="miss">✗</th><td>AI: ${esc(x.text)}</td><td>실제: ${esc(x.actual || '-')}</td></tr>`).join('')}</table>` : ''}
+        <details class="qs"><summary>대조한 숫자 전체</summary><table class="g-table">${v.list.map((x) => `<tr><th class="${x.status === '일치' ? 'hit' : x.status === '불일치' ? 'miss' : 'muted'}">${x.status === '일치' ? '✓' : x.status === '불일치' ? '✗' : '?'}</th><td>${esc(x.text)}</td><td>${esc(x.actual || x.status)}</td></tr>`).join('')}</table></details>`}`;
+    if (state.cmpText && $('#cmpOut') && !$('#cmpOut').dataset.filled) { $('#cmpOut').innerHTML = renderMarkdown(state.cmpText); $('#cmpOut').dataset.filled = '1'; }
+    const sc = $('#crossScore');
+    if (!sc) return;
+    const a = state.scored && state.actorScores;
+    sc.innerHTML = `<h3>③ 사후 채점 <span class="muted">출처별 5거래일 전망 적중률</span></h3>
+      ${a ? `<table class="g-table score-tbl"><tr>${S.ACTORS.map((x) => `<th>${esc(x.label)}</th>`).join('')}</tr>
+        <tr>${S.ACTORS.map((x) => `<td>${pct(a.byActor[x.name])} <span class="muted">(${a.byActor[x.name].hit}/${a.byActor[x.name].total}${a.byActor[x.name].pending ? `, 대기 ${a.byActor[x.name].pending}` : ''})</span></td>`).join('')}</tr></table>
+        <p class="muted">AI 결론을 얼마나 믿을지 판단하는 근거입니다. 채점이 쌓일수록 정확해집니다.</p>`
+        : '<p class="muted"><a href="#" data-act="load-scores">기록 불러와서 적중률 보기</a></p>'}
+      ${state.cmpMatch ? `<p>증권사 리포트 일치도: <span class="badge ${state.cmpMatch === '일치' ? 'good' : state.cmpMatch === '불일치' ? 'bad' : 'warn'}">${esc(state.cmpMatch)}</span></p>` : ''}`;
+  }
+
+  async function makeBriefNow() {
+    if (state.aiConcl && !confirm('지금 브리핑을 새로 만들까요? (기존 AI 결론은 바뀝니다)')) return;
+    await runDebate();
+    if (state.debate && state.debate.risk && !(state.debateRun || {}).error) await runChief();
+  }
+
+
+  // ---------- 산업 이슈 ----------
+  const IMPACT_TONE = { 긍정: 'good', 부정: 'bad', 혼재: 'warn', 중립: 'neutral' };
+  async function loadIndustry(silent) {
+    try {
+      const j = await api('/api/history?sheet=' + encodeURIComponent('산업 이슈') + '&limit=10');
+      const row = (j.rows || []).find((r) => r['날짜'] === state.date);
+      state.industry = row && row['이슈 JSON'] ? JSON.parse(row['이슈 JSON']) : null;
+      state.industryMsg = state.industry ? '' : `${state.date} 산업 이슈가 아직 없습니다.`;
+    } catch (e) { state.industryMsg = e.message; if (!silent) toast(e.message, 'err'); }
+    renderIndustry(); renderBrief();
+  }
+  async function makeIndustry() {
+    state.industryBusy = true; renderIndustry();
+    try {
+      const j = await api('/api/industry', { method: 'POST', body: '{}' });
+      state.industry = j.data; state.industryMsg = '';
+      toast(`산업 이슈 ${j.data.issues.length}개를 정리했습니다`, 'ok');
+    } catch (e) { toast(e.message, 'err'); state.industryMsg = e.message; }
+    state.industryBusy = false; renderIndustry(); renderBrief();
+  }
+  function renderIndustry() {
+    const box = $('#industryPanel');
+    if (!box) return;
+    const I = state.industry;
+    const busy = state.industryBusy;
+    box.innerHTML = `
+      <div class="card brief-hero"><div class="wk-head"><div>
+        <div class="brief-date">${esc(state.date)} 산업 이슈</div>
+        <div class="muted">${I ? `뉴스 ${I.newsCount}건 중 ${I.issues.length}개 이슈 · ${esc(I.model || '')}${I.macroUsed ? ' · 오늘 매크로 반영' : ''}` : esc(state.industryMsg || '불러오는 중…')}</div></div>
+        <div class="rec-actions"><button class="btn" data-act="load-industry" type="button" ${busy ? 'disabled' : ''}>불러오기</button>
+        <button class="btn primary" data-act="make-industry" type="button" ${busy ? 'disabled' : ''}>${busy ? '정리 중… (최대 1분)' : I ? '다시 만들기' : '지금 만들기'}</button></div></div>
+        ${I && I.headline ? `<p class="headline">${esc(I.headline)}</p>` : ''}
+        <p class="hint">연합뉴스·매일경제·비즈니스포스트 RSS(제목·짧은 요약)에서 AI가 전 산업 이슈를 골라 정리합니다. 근거 기사가 없는 이슈는 자동으로 뺍니다. 원문은 링크로 확인하세요.</p>
+      </div>
+      ${I ? I.issues.map((it) => `<div class="card issue">
+        <div class="wk-head"><div><span class="ind-tag">${esc(it.industry)}</span> <b class="issue-t">${esc(it.title)}</b></div>
+          <span class="badge ${IMPACT_TONE[it.impact] || 'neutral'}">${esc(it.impact || '')}</span></div>
+        <p>${esc(it.summary)}</p>
+        ${it.why ? `<p class="muted"><b>왜 중요한가</b> ${esc(it.why)}</p>` : ''}
+        ${it.macro_link ? `<p class="macro-l"><b>매크로 연결</b> ${esc(it.macro_link)}</p>` : ''}
+        ${it.companies && it.companies.length ? `<p><b>관련 기업</b> ${it.companies.map((c) => `<span class="chip ${c.inSource ? '' : 'warn'}" title="${c.inSource ? '근거 기사에 나옴' : '근거 기사에 없음 — 확인 필요'}">${esc(c.name)}${c.inSource ? '' : ' ?'}</span>`).join(' ')}</p>` : ''}
+        <div class="src-row"><span class="badge ${it.check === '근거 확인' ? 'good' : 'warn'}">${esc(it.check)}</span> ${it.links.map((l) => `<a href="${esc(l.link)}" target="_blank" rel="noopener">${esc(l.source)}: ${esc(l.title.slice(0, 40))} ↗</a>`).join('')}</div>
+      </div>`).join('') : ''}
+      ${I && I.feedErrors && I.feedErrors.length ? `<p class="muted">일부 RSS를 읽지 못했습니다: ${esc(I.feedErrors.join(' · '))}</p>` : ''}`;
+  }
+
+  // ---------- 오늘의 기업 ----------
+  async function loadCompany(silent) {
+    try {
+      const j = await api('/api/history?sheet=' + encodeURIComponent('기업 분석') + '&limit=30');
+      state.companyRows = j.rows || [];
+      const row = state.companyRows.find((r) => r['날짜'] === state.date);
+      state.company = row && row['카드 JSON'] ? JSON.parse(row['카드 JSON']) : null;
+      state.companyMsg = state.company ? '' : `${state.date} 기업 분석이 아직 없습니다.`;
+    } catch (e) { state.companyMsg = e.message; if (!silent) toast(e.message, 'err'); }
+    renderCompany(); renderBrief();
+  }
+  async function loadRank() {
+    state.rankBusy = true; renderCompany();
+    try { const j = await api('/api/company?rank=1'); state.rank = j; }
+    catch (e) { toast(e.message, 'err'); }
+    state.rankBusy = false; renderCompany();
+  }
+  async function makeCompany(ticker) {
+    state.companyBusy = ticker || 'auto'; renderCompany();
+    try {
+      const j = await api('/api/company', { method: 'POST', body: JSON.stringify(ticker ? { ticker } : {}) });
+      state.company = j.result; state.companyMsg = '';
+      state.companyRows = null;
+      toast(`${j.result.data.company.name} 분석 카드를 만들었습니다`, 'ok');
+      setTimeout(() => $('#companyCard') && $('#companyCard').scrollIntoView({ behavior: 'smooth' }), 50);
+    } catch (e) { toast(e.message, 'err'); }
+    state.companyBusy = null; renderCompany(); renderBrief();
+  }
+  function renderCompany() {
+    const box = $('#companyPanel');
+    if (!box) return;
+    const c = state.company;
+    const busy = state.companyBusy;
+    const R = state.rank;
+    const k = c ? c.card || {} : {};
+    const list = (arr) => `<ul>${(arr || []).map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
+    const past = (state.companyRows || []).filter((r) => r['날짜'] !== state.date).slice(0, 12);
+    box.innerHTML = `
+      <div class="card brief-hero"><div class="wk-head"><div>
+        <div class="brief-date">${esc(state.date)} 오늘의 기업</div>
+        <div class="muted">${c ? `${esc(c.reason)} · ${esc(c.model || '')}` : esc(state.companyMsg || '불러오는 중…')}</div></div>
+        <div class="rec-actions"><button class="btn" data-act="load-rank" type="button" ${state.rankBusy ? 'disabled' : ''}>${state.rankBusy ? '계산 중…' : '주목도 상위 20 보기'}</button>
+        <button class="btn primary" data-act="make-company" type="button" ${busy ? 'disabled' : ''}>${busy === 'auto' ? '분석 중… (최대 1분)' : c ? '자동 선정으로 다시 만들기' : '자동 선정해서 분석'}</button></div></div>
+        <p class="hint">한국·미국 대형주 후보군에서 <b>평소 대비 주가 변동 + 거래량 증가 + 뉴스 언급</b>으로 주목도를 매겨 1위(최근 2주 분석 종목 제외, 오늘 산업 이슈에 나오면 가산)를 분석합니다. 숫자는 DART·SEC·Yahoo에서 직접 계산하고 AI는 그 숫자로 해석합니다. <b>투자 권유가 아닌 분석 카드</b>입니다.</p>
+      </div>
+
+      ${R ? `<div class="card"><h2>주목도 상위 20 <span class="muted">${esc((R.rank[0] || {}).date || '')} 종가 기준 · 눌러서 분석</span></h2>
+        <table class="rec rank"><thead><tr><th>#</th><th>기업</th><th>1일</th><th>변동/평소</th><th>거래량 배수</th><th>뉴스</th><th>점수</th><th></th></tr></thead><tbody>
+        ${R.rank.map((x, i) => `<tr class="${R.pick && R.pick.ticker === x.ticker ? 'pick' : ''}"><td class="mono">${i + 1}</td><td><b>${esc(x.name)}</b> <span class="muted mono">${esc(x.ticker)}</span>${R.recent.includes(x.ticker) ? ' <span class="muted">(최근 분석)</span>' : ''}${x.bonus ? ' <span class="chip info">산업 이슈</span>' : ''}</td>
+          <td class="mono ${x.chg > 0 ? 'up' : x.chg < 0 ? 'down' : ''}">${signed(x.chg, 2, '%')}</td><td class="mono">${x.move}배</td><td class="mono">${x.volx}배</td><td class="mono">${x.news}</td><td class="mono"><b>${x.score}</b></td>
+          <td><button class="btn mini" data-act="analyze" data-val="${esc(x.ticker)}" type="button" ${busy ? 'disabled' : ''}>${busy === x.ticker ? '분석 중…' : '분석'}</button></td></tr>`).join('')}</tbody></table>
+        <div class="pick-row"><span class="muted">후보군 밖 종목:</span> <input type="text" id="customTicker" placeholder="예: 005490.KS 또는 AAPL" /> <button class="btn mini" data-act="analyze-custom" type="button" ${busy ? 'disabled' : ''}>분석</button></div></div>` : ''}
+
+      ${c ? `<div class="card company-card" id="companyCard">
+        <div class="wk-head"><div><div class="co-name">${esc(c.data.company.name)} <span class="muted mono">${esc(c.data.company.ticker)} · ${c.data.company.market === 'KR' ? '한국' : '미국'}</span></div>
+          <p class="headline">${esc(k.one_liner || '')}</p></div><span class="ai-warn">AI 분석 · 투자 권유 아님</span></div>
+        ${k.why_today ? `<p><b>오늘 주목받는 이유</b> ${esc(k.why_today)}</p>` : ''}
+        <h3>핵심 숫자 <span class="muted">${esc(c.data.source || '')}·Yahoo에서 직접 계산 · PER·PBR은 간이 계산</span></h3>
+        <div class="metric-grid">${c.data.metrics.map((m) => `<div class="metric"><div class="muted">${esc(m.label)}</div><div class="mono"><b>${esc(m.value)}</b></div></div>`).join('') || '<p class="muted">재무 데이터 없음</p>'}</div>
+        ${c.data.errors && c.data.errors.length ? `<p class="muted">일부 데이터를 가져오지 못했습니다: ${esc(c.data.errors.join(' · '))}</p>` : ''}
+        <div class="co-2">
+          <div><h3>무엇으로 돈을 버나</h3><p>${esc(k.business || '')}</p>
+            ${k.segments && k.segments.length ? `<p><b>주요 사업</b> ${k.segments.map(esc).join(' · ')}</p>` : ''}
+            ${k.competitors && k.competitors.length ? `<p><b>경쟁사</b> ${k.competitors.map(esc).join(' · ')}</p>` : ''}
+            <p class="muted">사업 구조·경쟁사는 AI의 일반 정보입니다. 사업보고서로 확인하세요.</p></div>
+          <div><h3>실적과 밸류에이션</h3><p>${esc(k.results || '')}</p><p>${esc(k.valuation || '')}</p>${k.macro_link ? `<p class="macro-l"><b>매크로·산업 연결</b> ${esc(k.macro_link)}</p>` : ''}</div>
+        </div>
+        <div class="bb2"><div class="bull-box"><b class="t-bull">BULL · 투자 포인트</b>${list(k.bull)}</div><div class="bear-box"><b class="t-bear">BEAR · 리스크</b>${list(k.bear)}</div></div>
+        ${k.kill_scenario ? `<p class="kill"><b>망하는 시나리오</b> ${esc(k.kill_scenario)}</p>` : ''}
+        ${k.checkpoints && k.checkpoints.length ? `<h3>체크포인트</h3>${list(k.checkpoints)}` : ''}
+        <h3>교차검증</h3>
+        <p><span class="badge ${c.verify && c.verify.bad.length ? 'warn' : 'good'}">숫자 근거 ${c.verify ? `${c.verify.ok}/${c.verify.total}` : '-'}</span>
+          ${c.verify && c.verify.bad.length ? `AI 문장에 데이터에 없는 숫자가 있습니다: <b>${c.verify.bad.map(esc).join(', ')}</b> — 위 핵심 숫자와 비교해 확인하세요.` : 'AI 문장의 숫자가 모두 제공 데이터에서 확인됩니다.'}</p>
+        <div class="co-2">
+          <div><b>관련 뉴스</b>${c.data.news.length ? `<ul>${c.data.news.map((n) => `<li><a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a> <span class="muted">${esc(n.source)}</span></li>`).join('')}</ul>` : '<p class="muted">최근 기사 없음</p>'}</div>
+          <div><b>최근 공시</b>${c.data.filings.length ? `<ul>${c.data.filings.map((f) => `<li><a href="${esc(f.link)}" target="_blank" rel="noopener">${esc(f.title)}</a> <span class="muted">${esc(f.date)}</span></li>`).join('')}</ul>` : '<p class="muted">최근 공시 없음</p>'}</div>
+        </div>
+      </div>` : ''}
+
+      ${past.length ? `<div class="card"><h2>지난 기업 카드 <span class="muted">면접 준비 자료로 쌓입니다</span></h2>
+        <table class="rec"><thead><tr><th>날짜</th><th>기업</th><th>한 줄 요약</th><th>숫자 검증</th></tr></thead><tbody>
+        ${past.map((r) => `<tr data-act="open-card" data-val="${esc(r['날짜'])}|${esc(r['티커'])}"><td class="mono">${esc(r['날짜'])}</td><td><b>${esc(r['기업'])}</b></td><td>${esc(r['한 줄 요약'])}</td><td class="muted">${esc(r['숫자 검증'])}</td></tr>`).join('')}</tbody></table></div>` : ''}`;
+  }
+  function openPastCard(val) {
+    const [d, t] = String(val).split('|');
+    const row = (state.companyRows || []).find((r) => r['날짜'] === d && r['티커'] === t);
+    if (row && row['카드 JSON']) { state.company = JSON.parse(row['카드 JSON']); renderCompany(); setTimeout(() => $('#companyCard') && $('#companyCard').scrollIntoView({ behavior: 'smooth' }), 50); }
+  }
+
   // ---------- 리포트 비교 ----------
   async function runCompare() {
-    const d = collect($('#view-daily'));
-    const concl = conclusionText(d);
+    const d = Object.assign(collect($('#view-daily')), collect($('#view-brief')));
+    const mine = conclusionText(collect($('#view-daily')));
+    const ai = aiConclText();
+    const concl = [ai && `[AI 센터장 결론]\n${ai}`, mine && `[사용자 결론]\n${mine}`].filter(Boolean).join('\n\n');
     const text = $('#reportText').value.trim();
     const file = $('#reportFile').files[0];
     if (!file && !text) { toast('리포트 PDF를 올리거나 내용을 붙여넣어 주세요', 'err'); return; }
-    if (!concl && !confirm('내 결론이 비어 있어요. 리포트 요약만 받을까요?')) return;
+    if (!concl && !confirm('비교할 결론이 아직 없어요. 리포트 요약만 받을까요?')) return;
     let pdf = null;
     if (file) {
       if (file.size > 3 * 1024 * 1024) { toast('PDF가 3MB를 넘어요. 핵심 부분을 붙여넣어 주세요', 'err'); return; }
@@ -496,8 +1052,11 @@
     try {
       const j = await api('/api/compare', { method: 'POST', body: JSON.stringify({ date: state.date, reportName: d['참고 리포트'] || '', reportText: text, pdfBase64: pdf, conclusionText: concl, signalsText: signalsText() }) });
       state.cmpText = j.text;
+      const mm = /일치도\s*[:：]\s*(부분 일치|불일치|일치)/.exec(j.text);
+      state.cmpMatch = mm ? mm[1] : '';
       $('#cmpOut').innerHTML = renderMarkdown(j.text) + `<div class="ai-meta">모델: ${esc(j.model)} · 리포트 원문은 저장하지 않고 비교 결과만 저장합니다. <button class="btn mini" data-act="cmp-to-memo" type="button">비교 메모에 옮기기</button></div>`;
       saveDraft();
+      renderBrief();
     } catch (e) {
       $('#cmpOut').innerHTML = `<div class="err">${esc(e.message)}</div>`;
     } finally {
@@ -619,27 +1178,89 @@
   function renderRecordsShell() {
     const url = settings().sheetUrl;
     $('#recordsPanel').innerHTML = `
+      <div class="card" id="scoreCard">
+        <div class="wk-head"><h2>전망 적중 기록</h2><span class="hint">5거래일 뒤 방향 · 자동 채점</span></div>
+        <div id="scoreBody"><span class="muted">아래 '불러오기'를 누르면 저장된 전망을 실제 데이터로 채점합니다.</span></div>
+      </div>
       <div class="card">
         <div class="wk-head"><h2>저장된 데일리 기록</h2>
           <div class="rec-actions">${url ? `<a class="btn ghost" href="${esc(url)}" target="_blank" rel="noopener">시트 열기 ↗</a>` : ''}<button class="btn" id="loadRecords">불러오기</button></div></div>
-        <div id="recordsTable"><span class="muted">'불러오기'를 누르면 구글 시트의 최근 30일 기록을 가져옵니다.</span></div>
+        <div id="recordsTable"><span class="muted">'불러오기'를 누르면 구글 시트의 기록을 가져옵니다.</span></div>
       </div>`;
   }
   async function loadRecords() {
     const box = $('#recordsTable');
     box.innerHTML = '<span class="muted">불러오는 중…</span>';
     try {
-      const j = await api('/api/history?sheet=데일리&limit=30');
-      state.records = j.rows || [];
+      const [j, wk, auto] = await Promise.all([
+        api('/api/history?sheet=데일리&limit=200'),
+        api('/api/history?sheet=주간&limit=60').catch(() => ({ rows: [] })),
+        api('/api/history?sheet=' + encodeURIComponent('자동 브리핑') + '&limit=200').catch(() => ({ rows: [] })),
+      ]);
+      state.records = mergeRecords(j.rows || [], auto.rows || []);
+      state.weeklyRecords = wk.rows || [];
+      renderScores();
       if (!state.records.length) { box.innerHTML = '<span class="muted">아직 저장된 기록이 없습니다.</span>'; return; }
-      box.innerHTML = `<table class="rec"><thead><tr><th>날짜</th><th>오늘의 동인</th><th>이야기</th><th>국면</th><th>뷰</th></tr></thead><tbody>${state.records.map((r, i) => `
-        <tr data-i="${i}"><td class="mono">${esc(r['날짜'])}</td><td>${esc(r['오늘의 동인'])}</td><td>${esc(r['이야기'])}</td><td>${esc(r['국면 판단'])}</td><td>${esc(r['뷰 변화'])}</td></tr>
-        <tr class="rec-detail" hidden><td colspan="5"><div class="rec-body">${esc(r['종합 해석'] || '(종합 해석 없음)')}</div></td></tr>`).join('')}</tbody></table>`;
+      box.innerHTML = `<table class="rec"><thead><tr><th>날짜</th><th>방식</th><th>오늘의 동인</th><th>이야기</th><th>국면</th><th>뷰</th></tr></thead><tbody>${state.records.map((r, i) => `
+        <tr data-i="${i}"><td class="mono">${esc(r['날짜'])}</td><td>${esc(r['작성 방식'] || '직접')}</td><td>${esc(r['오늘의 동인'])}</td><td>${esc(r['이야기'])}</td><td>${esc(r['국면 판단'])}</td><td>${esc(r['뷰 변화'])}</td></tr>
+        <tr class="rec-detail" hidden><td colspan="6"><div class="rec-body">${esc(r['종합 해석'] || '(종합 해석 없음)')}</div></td></tr>`).join('')}</tbody></table>`;
       renderWeekDaily();
       renderGuides();
     } catch (e) {
       box.innerHTML = `<div class="err">${esc(e.message)}</div>`;
     }
+  }
+  // 데일리 기록에 아침 자동 브리핑의 AI·BULL·BEAR 전망을 날짜별로 합침 (빈 칸만 채움)
+  function mergeRecords(daily, auto) {
+    const map = new Map();
+    daily.forEach((r) => map.set(r['날짜'], Object.assign({}, r)));
+    auto.forEach((a) => {
+      const r = map.get(a['날짜']) || { '날짜': a['날짜'], '작성 방식': 'AI 자동' };
+      Object.keys(a).forEach((k) => { if (/^(AI|BULL|BEAR)전망_/.test(k) && !r[k] && a[k]) r[k] = a[k]; });
+      if (!r['AI 종합 해석'] && a['AI 종합 해석']) r['AI 종합 해석'] = a['AI 종합 해석'];
+      map.set(a['날짜'], r);
+    });
+    return [...map.values()].sort((x, y) => String(y['날짜']).localeCompare(String(x['날짜'])));
+  }
+  function renderScores() {
+    const box = $('#scoreBody');
+    if (!box) return;
+    if (!state.records || !state.market) { box.innerHTML = '<span class="muted">기록과 시장 데이터를 불러오면 채점합니다.</span>'; return; }
+    const scored = S.scoreRecords(state.records, state.market.items);
+    state.scored = scored;
+    const { sum, rows } = scored;
+    const actors = S.scoreActors(state.records, state.market.items);
+    state.actorScores = actors;
+    setTimeout(renderCross, 0);
+    const withFc = rows.filter((r) => S.FORECASTS.some((f) => r.res[f.key].status !== '없음'));
+    const mark = (x) => x.status === '채점'
+      ? `<span class="${x.hit ? 'hit' : 'miss'}">${x.hit ? '✓' : '✗'}</span> <span class="muted">${esc(x.call)}→${esc(x.actual)}</span>`
+      : x.status === '대기' ? `<span class="muted">대기 ${x.remaining}일</span>` : x.status === '없음' ? '<span class="muted">–</span>' : `<span class="muted">${esc(x.status)}</span>`;
+    const vw = { 맞음: 0, '부분적으로 맞음': 0, 틀림: 0 };
+    (state.weeklyRecords || []).forEach((w) => { if (vw[w['뷰 검증']] != null) vw[w['뷰 검증']]++; });
+    const vwTotal = vw['맞음'] + vw['부분적으로 맞음'] + vw['틀림'];
+    box.innerHTML = withFc.length ? `
+      <div class="score-top">
+        <div class="score-big"><div class="sb-num">${pct(sum.all)}</div><div class="muted">전체 적중률 · ${sum.all.hit}/${sum.all.total}${sum.pending ? ` · 채점 대기 ${sum.pending}` : ''}</div></div>
+        <table class="g-table score-tbl">
+          <tr><th>지표</th>${S.FORECASTS.map((f) => `<th>${esc(f.label)}</th>`).join('')}</tr>
+          <tr><th>적중률</th>${S.FORECASTS.map((f) => `<td>${pct(sum.byAsset[f.key])} <span class="muted">(${sum.byAsset[f.key].hit}/${sum.byAsset[f.key].total})</span></td>`).join('')}</tr>
+        </table>
+        ${S.ACTORS.some((a) => actors.byActor[a.name].total) ? `<table class="g-table score-tbl">
+          <tr><th>출처별</th>${S.ACTORS.map((a) => `<th>${esc(a.label)}</th>`).join('')}</tr>
+          <tr><th>적중률</th>${S.ACTORS.map((a) => `<td>${pct(actors.byActor[a.name])} <span class="muted">(${actors.byActor[a.name].hit}/${actors.byActor[a.name].total})</span></td>`).join('')}</tr>
+        </table>` : ''}
+        <table class="g-table score-tbl">
+          <tr><th>작성 방식</th><th>직접</th><th>AI 작성 (브리핑·센터장)</th><th>주간 뷰 자기평가</th></tr>
+          <tr><th>적중률</th><td>${pct(sum.byMode['직접'])} <span class="muted">(${(sum.byMode['직접'] || { total: 0 }).total}건)</span></td><td>${pct(sum.byMode['AI 작성'])} <span class="muted">(${(sum.byMode['AI 작성'] || { total: 0 }).total}건)</span></td>
+            <td>${vwTotal ? `맞음 ${vw['맞음']} · 부분 ${vw['부분적으로 맞음']} · 틀림 ${vw['틀림']}` : '<span class="muted">주간 기록 없음</span>'}</td></tr>
+        </table>
+      </div>
+      <table class="rec score-list"><thead><tr><th>날짜</th><th>방식</th>${S.FORECASTS.map((f) => `<th>${esc(f.label)}</th>`).join('')}</tr></thead>
+        <tbody>${withFc.slice(0, 30).map((r) => `<tr><td class="mono">${esc(r.date)}</td><td>${esc(r.mode)}</td>${S.FORECASTS.map((f) => `<td>${mark(r.res[f.key])}</td>`).join('')}</tr>`).join('')}</tbody></table>
+      <p class="muted">기준: 점검일 직전 거래일 종가 → 5거래일 뒤 종가. 약 6개월보다 오래된 기록은 '기간 지남'으로 표시됩니다.</p>`
+      : '<span class="muted">아직 전망을 기록한 날이 없습니다. 오늘의 결론 ⑦에서 전망을 고르고 저장하세요.</span>';
+    renderGuides();
   }
   function renderWeekDaily() {
     const box = $('#weekDailyList');
@@ -689,6 +1310,9 @@
     const ap = $('#autoPhase');
     if (ap) ap.textContent = ph ? `자동 참고: ${ph.name}` : '';
     renderGuides();
+    renderCenter();
+    renderBrief();
+    if (state.records) renderScores();
     const weekDraft = keepDom ? Object.assign({}, store.get(weekKey(), {}), collect($('#view-weekly'))) : store.get(weekKey(), {});
     renderWeekly();
     restore($('#view-weekly'), weekDraft);
@@ -710,16 +1334,76 @@
     const head = s.signalDate ? [`신호 기준일: 미국 ${s.signalDate} 종가`] : [];
     const lines = head.concat(Object.entries(SIGNAL_TITLES).map(([k, t]) => (s[k] ? `${t}: ${s[k].name} — ${s[k].meaning}${s[k].detail ? ` (${s[k].detail})` : ''}` : null)).filter(Boolean));
     if (s.flags && s.flags.length) lines.push('주의 신호: ' + s.flags.join(' / '));
+    if (s.sectors) { const st = S.sectorText(s.sectors); if (st) lines.push('섹터 연결(규칙 기반): ' + st.replace(/\n/g, ' | ')); }
     return lines.join('\n');
   }
   function manualText(d) {
-    const skip = new Set(['오늘의 동인', '이야기', '한국 영향', '국면 판단', '뷰 변화', '다음 체크포인트', '종합 해석', '참고 리포트', '리포트 비교 메모']);
-    return Object.entries(d).filter(([k, v]) => !k.startsWith('확인_') && !k.startsWith('__') && !skip.has(k) && v !== '' && v !== false && v != null)
+    const skip = new Set(['오늘의 동인', '이야기', '한국 영향', '국면 판단', '뷰 변화', '다음 체크포인트', '투자 시사점', '종합 해석', '참고 리포트', '리포트 비교 메모', '전망 근거']);
+    return Object.entries(d).filter(([k, v]) => !k.startsWith('확인_') && !k.startsWith('__') && !k.startsWith('전망_') && !skip.has(k) && v !== '' && v !== false && v != null)
       .map(([k, v]) => `${k}: ${v === true ? '확인' : v}`).join('\n');
   }
   function conclusionText(d) {
-    return ['오늘의 동인', '이야기', '한국 영향', '국면 판단', '뷰 변화', '다음 체크포인트', '종합 해석']
-      .filter((k) => d[k]).map((k) => `${k}: ${d[k]}`).join('\n');
+    const lines = ['오늘의 동인', '이야기', '한국 영향', '국면 판단', '뷰 변화', '다음 체크포인트', '투자 시사점', '종합 해석']
+      .filter((k) => d[k]).map((k) => `${k}: ${d[k]}`);
+    const fc = S.FORECASTS.filter((f) => d[f.key]).map((f) => `${f.label} ${d[f.key]}`);
+    if (fc.length) lines.push(`5거래일 전망: ${fc.join(', ')}${d['전망 근거'] ? ` (근거: ${d['전망 근거']})` : ''}`);
+    return lines.join('\n');
+  }
+  const pct = (t) => (t && t.total ? `${Math.round((t.hit / t.total) * 100)}%` : '–');
+
+  // ---------- 작성 방식 (직접 / AI 브리핑 / AI 브리핑+수정) ----------
+  const CONCL_KEYS = ['오늘의 동인', '이야기', '한국 영향', '국면 판단', '뷰 변화', '다음 체크포인트', '투자 시사점', '종합 해석'].concat(S.FORECASTS.map((f) => f.key));
+  const snapshotOf = (d) => JSON.stringify(CONCL_KEYS.map((k) => d[k] || ''));
+  function authorMode() {
+    const m = state.authorMode || '';
+    if (!m.startsWith('AI')) return '직접';
+    return snapshotOf(collect($('#view-daily'))) === state.briefSnap ? m : `${m}+수정`;
+  }
+  // AI가 만든 결론(JSON)을 결론 칸에 채우기
+  function applyConclusion(b, mode) {
+    const pick = (v, opts) => (opts.includes(v) ? v : '');
+    setField('오늘의 동인', b['오늘의 동인'] || '');
+    setField('이야기', pick(b['이야기'], STORY_OPTS));
+    setField('한국 영향', b['한국 영향'] || '');
+    setField('국면 판단', pick(b['국면 판단'], PHASE_OPTS));
+    setField('다음 체크포인트', b['다음 체크포인트'] || '');
+    setField('투자 시사점', b['투자 시사점'] || '');
+    setField('종합 해석', b['종합 해석'] || '');
+    const view = pick(b['뷰 변화'], ['유지', '강화', '약화', '수정']);
+    $$('input[name="view"]').forEach((r) => { r.checked = r.value === view; });
+    $('#viewHidden').value = view;
+    const fc = b['전망'] || {};
+    S.FORECASTS.forEach((f) => setField(f.key, pick(fc[f.key.replace('전망_', '')], ['상승', '보합', '하락'])));
+    state.authorMode = mode;
+    state.briefSnap = snapshotOf(collect($('#view-daily')));
+    saveDraft();
+    updateModeTag();
+    renderGuides();
+  }
+  function updateModeTag() {
+    const t = $('#modeTag');
+    if (!t) return;
+    const m = authorMode();
+    t.textContent = m === '직접' ? '' : m;
+    t.className = 'mode-tag' + (m === '직접' ? '' : ' on');
+  }
+
+  async function runBrief() {
+    const cur = collect($('#view-daily'));
+    if (conclusionText(cur) && !confirm('이미 쓴 결론이 있어요. AI 브리핑으로 덮어쓸까요?')) return;
+    const btn = $('#briefBtn');
+    btn.disabled = true; btn.textContent = '브리핑 만드는 중…';
+    try {
+      const prev = previousRecord();
+      const previousText = prev ? `${prev.date}: 뷰 ${prev.rec['뷰 변화'] || '-'}, 국면 ${prev.rec['국면 판단'] || '-'}, ${prev.rec['종합 해석'] || prev.rec['오늘의 동인'] || ''}` : '';
+      const j = await api('/api/analyze', { method: 'POST', body: JSON.stringify({ mode: 'brief', date: state.date, dataText: dataText(), signalsText: signalsText(), manualText: manualText(cur), previousText }) });
+      applyConclusion(j.brief || {}, 'AI 브리핑');
+      toast(`AI 브리핑을 채웠습니다 (${j.model}). 확인하고 고쳐서 저장하세요`, 'ok');
+    } catch (e) {
+      toast(e.message, 'err');
+    } finally {
+      btn.disabled = false; btn.textContent = '⚡ AI 빠른 브리핑';
+    }
   }
   function renderMarkdown(md) {
     const lines = esc(md).split('\n');
@@ -743,7 +1427,7 @@
     btn.disabled = true; btn.textContent = '분석 중…';
     $('#aiOut').innerHTML = '<span class="muted">AI가 오늘의 데이터와 결론을 검토하고 있습니다…</span>';
     try {
-      const j = await api('/api/analyze', { method: 'POST', body: JSON.stringify({ date: state.date, dataText: dataText(), signalsText: signalsText(), manualText: manualText(d), conclusionText: conclusionText(d) }) });
+      const j = await api('/api/analyze', { method: 'POST', body: JSON.stringify({ date: state.date, dataText: dataText(), signalsText: signalsText(), manualText: manualText(d), conclusionText: conclusionText(d), debateText: debateSummaryText(state.debate) }) });
       state.aiText = j.text;
       $('#aiOut').innerHTML = renderMarkdown(j.text) + `<div class="ai-meta">모델: ${esc(j.model)} · AI 해석은 참고용이며 사실 확인이 필요합니다.</div>`;
       saveDraft();
@@ -756,7 +1440,7 @@
 
   // ---------- 시트 저장 ----------
   function buildDailyRecord() {
-    const d = collect($('#view-daily'));
+    const d = Object.assign(collect($('#view-daily')), collect($('#view-brief')));
     const ev = collect($('#view-event'));
     const rec = { '날짜': state.date, '저장시각': new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false }) };
     const ids = new Set();
@@ -776,6 +1460,7 @@
     ['curve', 'stockRate', 'alignment', 'dollar', 'vix', 'korea', 'phase'].forEach((k) => { rec[`자동_${SIGNAL_TITLES[k]}`] = s[k] ? s[k].name : ''; });
     rec['자동_주의 신호'] = (s.flags || []).join(' / ');
     rec['신호 기준일'] = s.signalDate || '';
+    rec['자동_섹터 시사점'] = s.sectors ? S.sectorText(s.sectors) : '';
     const checks = C.daily.filter((sec) => d[`확인_${sec.title}`]).length;
     rec['확인한 섹션'] = `${checks}/${C.daily.length}`;
     for (let i = 1; i <= 3; i++) {
@@ -797,6 +1482,23 @@
     }
     rec['AI 종합분석'] = state.aiText || '';
     rec['AI 리포트 비교'] = state.cmpText || '';
+    rec['작성 방식'] = authorMode();
+    const AC = state.aiConcl;
+    rec['AI 결론 JSON'] = AC ? JSON.stringify(AC) : '';
+    rec['AI 종합 해석'] = AC ? AC['종합 해석'] || '' : '';
+    rec['AI 결론 출처'] = state.aiSrc ? `${state.aiSrc.source} ${state.aiSrc.model || ''}`.trim() : '';
+    S.FORECASTS.forEach((f) => { const k = f.key.replace('전망_', ''); rec[`AI전망_${k}`] = AC && AC['전망'] ? AC['전망'][k] || '' : ''; });
+    const vv = verifyNow();
+    rec['교차검증_데이터'] = vv && vv.list.length ? `일치 ${vv.ok} · 불일치 ${vv.bad}${vv.bad ? ` (${vv.list.filter((x) => x.status === '불일치').map((x) => x.text).join(', ')})` : ''}` : '';
+    rec['교차검증_리포트 일치도'] = state.cmpMatch || '';
+    const D = state.debate || {};
+    rec['AI 토론'] = debateSummaryText(D);
+    rec['리스크팀 판단'] = D.risk ? D.risk.balance || '' : '';
+    S.FORECASTS.forEach((f) => {
+      const k = f.key.replace('전망_', '');
+      rec[`BULL전망_${k}`] = D.open && D.open.bull && D.open.bull.forecast ? D.open.bull.forecast[k] || '' : '';
+      rec[`BEAR전망_${k}`] = D.open && D.open.bear && D.open.bear.forecast ? D.open.bear.forecast[k] || '' : '';
+    });
     return rec;
   }
   async function saveDaily() {
@@ -805,6 +1507,7 @@
     try {
       const j = await api('/api/save', { method: 'POST', body: JSON.stringify({ sheet: '데일리', record: buildDailyRecord() }) });
       $('#saveNote').textContent = `${state.date} 기록을 시트 ${j.row}행에 ${j.updated ? '덮어썼습니다' : '추가했습니다'}.`;
+      if ($('#saveNoteBrief')) $('#saveNoteBrief').textContent = $('#saveNote').textContent;
       toast('구글 시트에 저장했습니다', 'ok');
     } catch (e) {
       toast(e.message, 'err');
@@ -842,6 +1545,9 @@
       $$('.tab').forEach((x) => x.classList.toggle('active', x === t));
       $$('.view').forEach((v) => v.classList.toggle('active', v.id === 'view-' + t.dataset.tab));
       if (t.dataset.tab === 'records' && !state.records) loadRecords();
+      if (t.dataset.tab === 'industry' && state.industryTried !== state.date) { state.industryTried = state.date; loadIndustry(true); }
+      if (t.dataset.tab === 'company' && state.companyTried !== state.date) { state.companyTried = state.date; loadCompany(true); }
+      if (t.dataset.tab === 'center' && !(state.debate && state.debate.open) && state.morningTried !== state.date) { state.morningTried = state.date; loadMorning(true); }
     }));
     $('#checkDate').value = state.date;
     $('#checkDate').addEventListener('change', (e) => {
@@ -880,12 +1586,45 @@
       else if (e.target.id === 'eventType') { renderEventChecklist(); saveDraft(); }
       else if (e.target.matches('[data-key]')) {
         saveDraft();
-        if (e.target.dataset.key === '이야기' || e.target.dataset.key.startsWith('외국인')) renderGuides();
+        if (e.target.dataset.key === '이야기' || e.target.dataset.key.startsWith('외국인') || e.target.dataset.key === '업종 상위·하위') renderGuides();
       }
     });
+    // 뷰 버튼: 이미 고른 버튼을 다시 누르면 선택 해제
+    document.addEventListener('pointerdown', (e) => {
+      const lab = e.target.closest('.seg label');
+      if (lab) lab.dataset.was = lab.querySelector('input').checked ? '1' : '';
+    });
     document.addEventListener('click', (e) => {
+      const segLab = e.target.closest('.seg label');
+      if (segLab && segLab.dataset.was === '1') {
+        e.preventDefault();
+        segLab.querySelector('input').checked = false;
+        segLab.dataset.was = '';
+        $('#viewHidden').value = '';
+        saveDraft();
+        renderGuides();
+        return;
+      }
       const act = e.target.closest('[data-act]');
       if (act) {
+        const a = act.dataset.act;
+        if (a === 'goto-conclusion') { gotoTab('daily'); setTimeout(() => $('#conclusionPanel').scrollIntoView({ behavior: 'smooth' }), 50); return; }
+        if (a === 'goto-center') { e.preventDefault(); gotoTab('center'); return; }
+        if (a === 'ai-chief') { runChief(); return; }
+        if (a === 'load-morning') { loadMorning(false); return; }
+        if (a === 'load-industry') { loadIndustry(false); return; }
+        if (a === 'make-industry') { makeIndustry(); return; }
+        if (a === 'load-rank') { loadRank(); return; }
+        if (a === 'make-company') { if (state.company && !confirm('오늘 기업 카드를 새로 만들까요?')) return; makeCompany(); return; }
+        if (a === 'analyze') { makeCompany(act.dataset.val); return; }
+        if (a === 'analyze-custom') { const t = ($('#customTicker') || {}).value; if (t && t.trim()) makeCompany(t.trim()); return; }
+        if (a === 'open-card') { openPastCard(act.dataset.val); return; }
+        if (a === 'goto-industry') { e.preventDefault(); gotoTab('industry'); return; }
+        if (a === 'goto-company') { e.preventDefault(); gotoTab('company'); return; }
+        if (a === 'goto-brief') { e.preventDefault(); gotoTab('brief'); return; }
+        if (a === 'load-scores') { e.preventDefault(); loadRecords(); return; }
+        if (a === 'copy-ai-concl') { e.preventDefault(); if (conclusionText(collect($('#view-daily'))) && !confirm('내 결론 칸을 AI 결론으로 바꿀까요?')) return; applyConclusion(state.aiConcl || {}, 'AI 리서치센터'); gotoTab('daily'); setTimeout(() => $('#conclusionPanel').scrollIntoView({ behavior: 'smooth' }), 50); return; }
+        if (a === 'debate-resume') { const f = (state.debateRun || {}).failed; f === 'chief' ? runChief() : runDebate(f); return; }
         if (act.dataset.act === 'cmp-to-memo') {
           const plain = (state.cmpText || '').replace(/^#+\s*/gm, '').replace(/\*\*/g, '');
           setField('리포트 비교 메모', plain, 'append');
@@ -894,6 +1633,13 @@
       }
       if (e.target.id === 'aiBtn') runAI();
       else if (e.target.id === 'compareBtn') runCompare();
+      else if (e.target.id === 'briefBtn') runBrief();
+      else if (e.target.id === 'briefMake') makeBriefNow();
+      else if (e.target.id === 'saveBrief') saveDaily();
+      else if (e.target.id === 'debateStart') {
+        if (state.debate && state.debate.open && !confirm('지금 토론을 지우고 처음부터 다시 할까요?')) return;
+        runDebate();
+      }
       else if (e.target.id === 'toggleGuides') {
         const open = !guidesOpen();
         store.set('md-guides-open', open);
@@ -910,17 +1656,32 @@
   }
 
   function renderAll(fetchData) {
+    renderBriefShell();
     renderConclusion();
     renderEvent();
     renderRecordsShell();
     const draft = store.get(draftKey(), {});
     restore($('#conclusionPanel'), draft);
     restore($('#eventPanel'), draft);
+    restore($('#briefPanel'), draft);
     renderEventChecklist();
     if (draft['뷰 변화']) { const r = $(`input[name="view"][value="${draft['뷰 변화']}"]`); if (r) r.checked = true; }
     state.aiText = draft.__ai || '';
     $('#aiOut').innerHTML = state.aiText ? renderMarkdown(state.aiText) : '<span class="muted">아직 분석하지 않았습니다.</span>';
     state.cmpText = draft.__cmp || '';
+    state.authorMode = draft.__mode || '';
+    state.debate = draft.__debate || null;
+    state.debateRun = {};
+    state.briefSnap = draft.__snap || '';
+    state.aiConcl = draft.__aiConcl || null;
+    state.aiSrc = draft.__aiSrc || null;
+    state.cmpMatch = draft.__cmpMatch || '';
+    state.morningMsg = '';
+    if (!state.aiConcl && state.morningTried !== state.date) { state.morningTried = state.date; setTimeout(() => loadMorning(true), 0); }
+    state.industry = null; state.company = null; state.rank = null; state.companyRows = null;
+    state.industryTried = state.date; state.companyTried = state.date;
+    setTimeout(() => { loadIndustry(true); loadCompany(true); }, 0);
+    setTimeout(updateModeTag, 0);
     if (state.cmpText) $('#cmpOut').innerHTML = renderMarkdown(state.cmpText);
     if (fetchData) loadMarket(); else rerenderData(false);
   }

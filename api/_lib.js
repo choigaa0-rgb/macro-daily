@@ -67,8 +67,9 @@ function pickLight(names, primary) {
   return pool[0] || null;
 }
 
-async function requestOnce({ key, model, system, parts, temperature, maxOutputTokens, thinking, timeoutMs }) {
+async function requestOnce({ key, model, system, parts, temperature, maxOutputTokens, thinking, timeoutMs, json }) {
   const generationConfig = { temperature, maxOutputTokens };
+  if (json) generationConfig.responseMimeType = 'application/json';
   if (thinking) generationConfig.thinkingConfig = { thinkingLevel: thinking };
   const r = await fetchWithTimeout(
     `${GEMINI}/models/${encodeURIComponent(model)}:generateContent`,
@@ -88,14 +89,14 @@ async function requestOnce({ key, model, system, parts, temperature, maxOutputTo
   return { ok: false, status: r.status, error: (j.error && j.error.message) || `Gemini 오류 ${r.status}` };
 }
 
-async function callGemini({ system, parts, temperature = 0.4, maxOutputTokens = 2048 }) {
+async function callGemini({ system, parts, temperature = 0.4, maxOutputTokens = 2048, json = false, budgetMs = 56000, primaryMs = 28000 }) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return { ok: false, status: 500, error: 'GEMINI_API_KEY가 설정되지 않았습니다.' };
   const primary = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
   const thinkingSetting = process.env.GEMINI_THINKING || 'low';
   let thinking = thinkingSetting === 'off' ? null : thinkingSetting;
   const started = Date.now();
-  const left = () => 56000 - (Date.now() - started);
+  const left = () => budgetMs - (Date.now() - started);
   const tried = [];
   let lastErr = '';
 
@@ -107,10 +108,10 @@ async function callGemini({ system, parts, temperature = 0.4, maxOutputTokens = 
   const attempt = async (model, timeoutMs) => {
     tried.push(model);
     try {
-      let r = await requestOnce({ key, model, system, parts, temperature, maxOutputTokens, thinking, timeoutMs });
+      let r = await requestOnce({ key, model, system, parts, temperature, maxOutputTokens, thinking, timeoutMs, json });
       if (!r.ok && r.status === 400 && thinking && /think/i.test(r.error)) {
         thinking = null; // 이 모델은 thinking 설정을 모름 → 빼고 다시
-        r = await requestOnce({ key, model, system, parts, temperature, maxOutputTokens, thinking, timeoutMs: Math.max(left() - 1500, 3000) });
+        r = await requestOnce({ key, model, system, parts, temperature, maxOutputTokens, thinking, json, timeoutMs: Math.max(left() - 1500, 3000) });
       }
       return r;
     } catch (e) {
@@ -119,7 +120,7 @@ async function callGemini({ system, parts, temperature = 0.4, maxOutputTokens = 
   };
 
   // 1) 기본 모델
-  let r = await attempt(primary, 28000);
+  let r = await attempt(primary, Math.min(primaryMs, left() - 2000));
   if (r.ok) return { ok: true, model: primary, text: r.text };
   lastErr = r.error;
   const retryable = (x) => x.status === 504 || x.status === 429 || x.status === 503 || x.status === 500 || x.status === 200;
@@ -151,4 +152,39 @@ async function callGemini({ system, parts, temperature = 0.4, maxOutputTokens = 
   return { ok: false, status: 502, error: `AI 호출 실패 (시도: ${tryList}): ${lastErr}` };
 }
 
-module.exports = { sendJson, checkPasscode, fetchWithTimeout, readBody, callGemini, listModels, pickLight };
+// ---------- 구글 시트 (Apps Script 웹앱) ----------
+async function sheetPost(payload) {
+  const hook = process.env.SHEET_WEBHOOK_URL;
+  if (!hook) throw new Error('SHEET_WEBHOOK_URL 미설정');
+  const r = await fetchWithTimeout(hook, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ secret: process.env.SHEET_SECRET || '' }, payload)), redirect: 'follow' }, 15000);
+  const j = JSON.parse(await r.text());
+  if (!j.ok) throw new Error(j.error || '시트 응답 오류');
+  return j;
+}
+async function sheetRows(sheet, limit = 30) {
+  const hook = process.env.SHEET_WEBHOOK_URL;
+  if (!hook) return [];
+  const u = new URL(hook);
+  u.searchParams.set('secret', process.env.SHEET_SECRET || '');
+  u.searchParams.set('sheet', sheet);
+  u.searchParams.set('limit', String(limit));
+  try {
+    const r = await fetchWithTimeout(u.toString(), { redirect: 'follow' }, 12000);
+    const j = JSON.parse(await r.text());
+    return j.ok ? j.rows || [] : [];
+  } catch (e) { return []; }
+}
+function isAuthorized(req) {
+  const url = new URL(req.url, 'http://x');
+  const pass = process.env.APP_PASSCODE;
+  if (!pass) return true;
+  return req.headers['x-app-passcode'] === pass || url.searchParams.get('pass') === pass ||
+    (process.env.CRON_SECRET && req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`);
+}
+function parseJsonLoose(text) {
+  const t = String(text).replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  try { return JSON.parse(t); } catch (e) { const m = t.match(/\{[\s\S]*\}/); try { return m ? JSON.parse(m[0]) : null; } catch (e2) { return null; } }
+}
+const kstDate = () => new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+
+module.exports = { sendJson, checkPasscode, fetchWithTimeout, readBody, callGemini, listModels, pickLight, sheetPost, sheetRows, isAuthorized, parseJsonLoose, kstDate };

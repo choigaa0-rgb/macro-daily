@@ -1,6 +1,22 @@
 {
   "functions": {
-    "api/analyze.js": { "maxDuration": 60 },
-    "api/compare.js": { "maxDuration": 60 }
+    "api/analyze.js": {
+      "maxDuration": 60
+    },
+    "api/compare.js": {
+      "maxDuration": 60
+    },
+    "api/debate.js": {
+      "maxDuration": 60
+    },
+    "api/morning.js": {
+      "maxDuration": 60
+    },
+    "api/industry.js": {
+      "maxDuration": 60
+    },
+    "api/company.js": {
+      "maxDuration": 60
+    }
   }
 }

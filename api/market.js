@@ -59,7 +59,7 @@ function summarize(id, points, source) {
     chg5: week && week !== last ? diff(last.value, week.value) : null,
     chgUnit: isRate ? 'bp' : diffUnit || '%',
     spark: points.slice(-20).map((p) => p.value),
-    pts: points.slice(-30).map((p) => [p.date, p.value]), // 날짜 맞추기용
+    pts: points.slice(-130).map((p) => [p.date, p.value]), // 날짜 맞추기·전망 채점용 (약 6개월)
   };
 }
 
@@ -95,7 +95,7 @@ async function getTreasuryYear(type, year) {
 async function getTreasury(type, columns) {
   const year = new Date().getUTCFullYear();
   let rows = await getTreasuryYear(type, year);
-  if (rows.length < 30) rows = rows.concat(await getTreasuryYear(type, year - 1).catch(() => []));
+  if (rows.length < 130) rows = rows.concat(await getTreasuryYear(type, year - 1).catch(() => []));
   const out = {};
   for (const [id, col] of Object.entries(columns)) {
     const pts = rows
@@ -117,7 +117,7 @@ const subtract = (a, b, digits = 2) => combine(a, b, (x, y) => x - y, digits);
 
 // ---------- Yahoo / FRED / ECOS ----------
 async function getYahoo(symbol) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=2mo&interval=1d`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=6mo&interval=1d`;
   const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'Mozilla/5.0 (macro-dashboard)' } });
   if (!r.ok) throw new Error(`Yahoo ${r.status}`);
   const j = await r.json();
@@ -136,7 +136,7 @@ async function getYahoo(symbol) {
 }
 
 async function getFred(series, key) {
-  const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${series}&api_key=${key}&file_type=json&sort_order=desc&limit=40`;
+  const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${series}&api_key=${key}&file_type=json&sort_order=desc&limit=140`;
   const r = await fetchWithTimeout(url);
   if (!r.ok) throw new Error(`FRED ${r.status}`);
   const j = await r.json();
@@ -148,9 +148,9 @@ async function getFred(series, key) {
 
 async function getEcos(item, key) {
   const end = new Date();
-  const start = new Date(end.getTime() - 60 * 86400000);
+  const start = new Date(end.getTime() - 200 * 86400000);
   const f = (d) => d.toISOString().slice(0, 10).replace(/-/g, '');
-  const url = `https://ecos.bok.or.kr/api/StatisticSearch/${key}/json/kr/1/100/817Y002/D/${f(start)}/${f(end)}/${item}`;
+  const url = `https://ecos.bok.or.kr/api/StatisticSearch/${key}/json/kr/1/300/817Y002/D/${f(start)}/${f(end)}/${item}`;
   const r = await fetchWithTimeout(url);
   if (!r.ok) throw new Error(`ECOS ${r.status}`);
   const j = await r.json();
@@ -162,11 +162,8 @@ async function getEcos(item, key) {
   }));
 }
 
-module.exports = async (req, res) => {
-  const url = new URL(req.url, 'http://x');
-  if (url.searchParams.get('mock') === '1' || process.env.MOCK_DATA === '1') {
-    return sendJson(res, 200, require('./_mock.js'));
-  }
+// 데이터 수집 본체 (아침 자동 브리핑에서도 씀)
+async function collectMarket() {
 
   const items = {};
   const raw = {}; // Yahoo 원본 시리즈 (계산 지표용)
@@ -257,6 +254,16 @@ module.exports = async (req, res) => {
     items.cuau = { ok: true, source: '계산', date: items.copper.date, value: round(now, 3), chg: null, chg5: prev5 ? round(((now - prev5) / prev5) * 100, 2) : null, chgUnit: '%' };
   }
 
+  return { ok: true, fetchedAt: new Date().toISOString(), items, errors };
+}
+
+module.exports = async (req, res) => {
+  const url = new URL(req.url, 'http://x');
+  if (url.searchParams.get('mock') === '1' || process.env.MOCK_DATA === '1') {
+    return sendJson(res, 200, require('./_mock.js'));
+  }
+  const data = await collectMarket();
   res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=1800');
-  sendJson(res, 200, { ok: true, fetchedAt: new Date().toISOString(), items, errors });
+  sendJson(res, 200, data);
 };
+module.exports.collectMarket = collectMarket;

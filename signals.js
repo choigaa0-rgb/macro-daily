@@ -227,13 +227,184 @@
     return { pick, why };
   }
 
+  // ---------- 전망 채점 ----------
+  // 전망은 '다음 5거래일 뒤 방향'. 기준값 = 점검일 직전 거래일 종가 (점검 시점에 알 수 있던 값)
+  // 보합 범위 안이면 '보합'으로 봅니다.
+  const FORECASTS = [
+    { key: '전망_미국10년물', id: 'us10y', label: '미국 10년물', dead: 3, rate: true, unitText: '±3bp' },
+    { key: '전망_S&P500', id: 'spx', label: 'S&P500', dead: 0.5, rate: false, unitText: '±0.5%' },
+    { key: '전망_원달러', id: 'usdkrw', label: '원달러', dead: 0.5, rate: false, unitText: '±0.5%' },
+    { key: '전망_KOSPI', id: 'kospi', label: 'KOSPI', dead: 0.7, rate: false, unitText: '±0.7%' },
+  ];
+  const HORIZON = 5;
+
+  function scoreOne(pts, recordDate, call, f) {
+    if (!call) return { status: '없음' };
+    if (!pts || !pts.length) return { status: '데이터 없음' };
+    let bi = -1;
+    for (let i = 0; i < pts.length; i++) { if (pts[i][0] < recordDate) bi = i; else break; }
+    if (bi < 0) return { status: '기간 지남' }; // 보관 중인 이력(약 6개월)보다 오래된 기록
+    const ti = bi + HORIZON;
+    if (ti >= pts.length) return { status: '대기', remaining: ti - (pts.length - 1) };
+    const b = pts[bi][1], t = pts[ti][1];
+    const chg = f.rate ? Math.round((t - b) * 1000) / 10 : Math.round(((t - b) / b) * 10000) / 100;
+    const actual = chg > f.dead ? '상승' : chg < -f.dead ? '하락' : '보합';
+    return { status: '채점', call, actual, chg, hit: actual === call, baseDate: pts[bi][0], targetDate: pts[ti][0] };
+  }
+
+  // records: 시트 기록 배열, items: /api/market 결과
+  function scoreRecords(records, items) {
+    const rows = (records || []).map((r) => {
+      const res = {};
+      FORECASTS.forEach((f) => { res[f.key] = scoreOne(items[f.id] && items[f.id].pts, r['날짜'], r[f.key], f); });
+      return { date: r['날짜'], mode: r['작성 방식'] || '직접', res };
+    });
+    const tally = () => ({ hit: 0, total: 0 });
+    const sum = { all: tally(), byAsset: {}, byMode: {}, pending: 0 };
+    FORECASTS.forEach((f) => { sum.byAsset[f.key] = tally(); });
+    rows.forEach((row) => {
+      FORECASTS.forEach((f) => {
+        const x = row.res[f.key];
+        if (x.status === '대기') sum.pending++;
+        if (x.status !== '채점') return;
+        const m = row.mode.startsWith('AI') ? 'AI 작성' : '직접';
+        sum.byMode[m] = sum.byMode[m] || tally();
+        [sum.all, sum.byAsset[f.key], sum.byMode[m]].forEach((t) => { t.total++; if (x.hit) t.hit++; });
+      });
+    });
+    return { rows, sum };
+  }
+
+  // ---------- 매크로 → 섹터 시사점 (교과서적 연결, 참고용) ----------
+  // 각 규칙: 조건이 맞으면 유리(fav)·불리(unfav) 섹터와 이유를 더함. 같은 섹터가 양쪽에 걸리면 '엇갈림'으로 뺌.
+  function sectorView(sig, items) {
+    if (!sig || !items) return null;
+    const A = align(items).items;
+    const ch = (src, id) => c(src, id);
+    const fav = {}, unfav = {};
+    const add = (bucket, sectors, why) => sectors.forEach((s) => { (bucket[s] = bucket[s] || []).push(why); });
+    const sr = sig.stockRate && sig.stockRate.name;
+    if (sr === '좋은 금리 상승') { add(fav, ['금융(은행)', '산업재', '소재'], '경기 개선 + 금리 상승'); add(unfav, ['유틸리티', '리츠·부동산'], '금리 상승 부담'); }
+    if (sr === '나쁜 금리 상승') { add(fav, ['금융(은행)'], '금리 상승'); add(unfav, ['기술·성장주', '리츠·부동산', '중소형주'], '긴축·물가 우려로 할인율 상승'); }
+    if (sr === '골디락스') { add(fav, ['기술·성장주', '반도체', '중소형주'], '인하 기대 + 경기 양호'); add(unfav, ['필수소비재', '유틸리티'], '방어주 상대 열위'); }
+    if (sr === '위험 회피') { add(fav, ['필수소비재', '유틸리티', '헬스케어'], '위험 회피 시 방어주'); add(unfav, ['반도체', '중소형주', '산업재'], '경기 둔화 우려'); }
+    const cv = sig.curve && sig.curve.name;
+    if (cv && cv.includes('스티프닝')) add(fav, ['금융(은행)'], `커브 ${cv}: 예대마진 개선`);
+    if (cv && cv.includes('플래트닝')) add(unfav, ['금융(은행)'], `커브 ${cv}: 예대마진 부담`);
+    const krwP = ch(items, 'usdkrw');
+    if (krwP != null && krwP >= 0.3) { add(fav, ['수출주(자동차·조선)', '반도체'], `원화 약세(원달러 +${krwP}%)`); add(unfav, ['항공·여행', '내수 소비'], '원화 약세로 원가·구매력 부담'); }
+    if (krwP != null && krwP <= -0.3) { add(fav, ['항공·여행', '내수 소비'], `원화 강세(원달러 ${krwP}%)`); add(unfav, ['수출주(자동차·조선)', '반도체'], '원화 강세로 환산 이익 감소'); }
+    const oil = ch(A, 'wti');
+    if (oil != null && oil >= 1.5) { add(fav, ['에너지·정유'], `유가 상승(WTI +${oil}%)`); add(unfav, ['항공·여행', '화학'], '유가 상승으로 원가 부담'); }
+    if (oil != null && oil <= -1.5) { add(fav, ['항공·여행', '화학'], `유가 하락(WTI ${oil}%)`); add(unfav, ['에너지·정유'], '유가 하락'); }
+    const sox = ch(A, 'sox');
+    if (sox != null && sox >= 1.5) add(fav, ['반도체'], `미국 반도체 강세(SOX +${sox}%)`);
+    if (sox != null && sox <= -1.5) add(unfav, ['반도체'], `미국 반도체 약세(SOX ${sox}%)`);
+    const kr10 = ch(items, 'kr10y');
+    if (kr10 != null && kr10 >= 5) { add(fav, ['금융(은행·보험)'], `국고채 10년 +${kr10}bp`); add(unfav, ['건설', '리츠·부동산'], '국내 금리 상승'); }
+    if (kr10 != null && kr10 <= -5) { add(fav, ['건설', '리츠·부동산'], `국고채 10년 ${kr10}bp`); }
+    const mixed = Object.keys(fav).filter((s) => unfav[s]);
+    const pack = (b) => Object.keys(b).filter((s) => !mixed.includes(s)).map((s) => ({ sector: s, why: b[s] })).sort((x, y) => y.why.length - x.why.length);
+    return { fav: pack(fav), unfav: pack(unfav), mixed: mixed.map((s) => ({ sector: s, fav: fav[s], unfav: unfav[s] })) };
+  }
+  function sectorText(v) {
+    if (!v) return '';
+    const f = (arr) => arr.map((x) => `${x.sector}(${x.why.join(', ')})`).join('; ');
+    const L = [];
+    if (v.fav.length) L.push(`유리: ${f(v.fav)}`);
+    if (v.unfav.length) L.push(`불리: ${f(v.unfav)}`);
+    if (v.mixed.length) L.push(`엇갈림: ${v.mixed.map((x) => x.sector).join(', ')}`);
+    return L.join('\n');
+  }
+
+  // 출처별 전망 적중률: AI 센터장 · BULL · BEAR · 나. 출처마다 전망이 있는 기록만 따로 집계
+  const ACTORS = [
+    { name: 'AI', prefix: 'AI전망_', label: 'AI 센터장' },
+    { name: 'BULL', prefix: 'BULL전망_', label: 'BULL' },
+    { name: 'BEAR', prefix: 'BEAR전망_', label: 'BEAR' },
+    { name: '나', prefix: '전망_', label: '나' },
+  ];
+  function scoreActors(records, items) {
+    const byActor = {};
+    ACTORS.forEach((a) => {
+      const t = { hit: 0, total: 0, pending: 0, days: 0 };
+      (records || []).forEach((r) => {
+        let any = false;
+        FORECASTS.forEach((f) => {
+          const x = scoreOne(items[f.id] && items[f.id].pts, r['날짜'], r[f.key.replace('전망_', a.prefix)], f);
+          if (x.status === '대기') t.pending++;
+          if (x.status !== '채점') return;
+          any = true; t.total++; if (x.hit) t.hit++;
+        });
+        if (any) t.days++;
+      });
+      byActor[a.name] = t;
+    });
+    return { byActor };
+  }
+
+  // ---------- 교차검증 ①: AI 문장 속 숫자를 실제 데이터와 대조 ----------
+  // "KOSPI −0.81%", "2년물 +5.0bp", "원달러 +10원"처럼 지표 이름 뒤에 나온 변화 수치를 찾아 데이터와 비교
+  const ALIASES = [
+    ['kr10y', ['국고채 10년', '국고채10년']], ['kr3y', ['국고채 3년', '국고채3년']],
+    ['t10y2y', ['장단기 금리차', '2s10s']], ['us2y', ['미국 2년물', '2년물']], ['us10y', ['미국 10년물', '10년물']],
+    ['dxy', ['달러인덱스', '달러 인덱스', 'DXY']], ['usdkrw', ['원달러', '원/달러', '달러/원']],
+    ['sox', ['필라델피아 반도체', '필라델피아반도체', '미국 반도체', 'SOX']], ['spx', ['S&P500', 'S&P 500']],
+    ['ndx', ['나스닥']], ['dow', ['다우']], ['rut', ['러셀2000', '러셀']], ['wti', ['WTI']], ['brent', ['브렌트']],
+    ['copper', ['구리']], ['vix', ['VIX']], ['kosdaq', ['KOSDAQ', '코스닥']], ['kospi', ['KOSPI', '코스피']],
+  ];
+  function verifyClaims(text, items) {
+    if (!text || !items) return [];
+    const A = align(items).items;
+    const out = [];
+    const used = [];
+    const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    ALIASES.forEach(([id, names]) => {
+      names.forEach((nm) => {
+        const re = new RegExp(`${esc(nm)}[^0-9+\\-−\\n]{0,10}?([+\\-−]?\\d+(?:\\.\\d+)?)\\s*(bp|%|원)(?:\\s*(상승|하락|올|내|강세|약세))?`, 'g');
+        let m;
+        while ((m = re.exec(text))) {
+          const at = m.index;
+          if (used.some(([s0, e0]) => at < e0 && at + m[0].length > s0)) continue; // 더 구체적인 이름이 이미 잡은 구간
+          used.push([at, at + m[0].length]);
+          let n = Number(m[1].replace('−', '-'));
+          const unit = m[2];
+          const signed = /^[+\-−]/.test(m[1]);
+          if (!signed && m[3]) n = /하락|내|약세/.test(m[3]) ? -Math.abs(n) : Math.abs(n);
+          const cands = [A[id], items[id]].filter((x) => x && x.ok);
+          if (!cands.length) { out.push({ id, text: m[0], status: '데이터 없음' }); continue; }
+          let status = '확인 불가', actual = null;
+          for (const it of cands) {
+            if (unit === 'bp' && it.chgUnit === 'bp' && it.chg != null) {
+              actual = `${it.chg > 0 ? '+' : ''}${it.chg}bp`;
+              status = Math.abs(it.chg - n) <= 1.05 ? '일치' : '불일치';
+            } else if (unit === '원' && id === 'usdkrw' && it.prev != null) {
+              const w = Math.round((it.value - it.prev) * 10) / 10;
+              actual = `${w > 0 ? '+' : ''}${w}원`;
+              status = Math.abs(w - n) <= 1.5 ? '일치' : '불일치';
+            } else if (unit === '%' && it.chgUnit === '%' && (signed || m[3]) && it.chg != null) {
+              actual = `${it.chg > 0 ? '+' : ''}${it.chg}%`;
+              status = Math.abs(it.chg - n) <= 0.11 ? '일치' : '불일치';
+            } else if (unit === '%' && it.chgUnit === 'bp' && !signed && !m[3]) {
+              actual = `${it.value}%`; // 금리 수준
+              status = Math.abs(it.value - n) <= 0.03 ? '일치' : '불일치';
+            }
+            if (status === '일치') break;
+          }
+          out.push({ id, text: m[0].trim(), claimed: n, unit, actual, status });
+        }
+      });
+    });
+    return out;
+  }
+
   function all(items) {
     const A = align(items);
     const us = A.items;
     // 한국 전이: 미국은 기준일(전날 뉴욕 종가), 한국은 최신(그 뒤 열린 서울 장)으로 비교
     const kr = Object.assign({}, us, { kospi: items.kospi, kosdaq: items.kosdaq, usdkrw: items.usdkrw });
     const pct = (id) => c(us, id);
-    return {
+    const out = {
       signalDate: A.date,
       dateMismatch: A.mismatch,
       latestDate: A.latest,
@@ -248,7 +419,9 @@
       phase: phase(us),
       flags: flags(us),
     };
+    out.sectors = sectorView(out, items);
+    return out;
   }
 
-  return { curve, stockRate, alignment, decompose, vixRegime, hyRegime, dollar, korea, phase, flags, align, all, topMovers, recommendStory };
+  return { curve, stockRate, alignment, decompose, vixRegime, hyRegime, dollar, korea, phase, flags, align, all, topMovers, recommendStory, FORECASTS, HORIZON, scoreOne, scoreRecords, ACTORS, scoreActors, sectorView, sectorText, verifyClaims };
 });

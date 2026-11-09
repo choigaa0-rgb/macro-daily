@@ -9,7 +9,8 @@ module.exports = async (req, res) => {
   if (!hook) return sendJson(res, 500, { ok: false, error: 'SHEET_WEBHOOK_URL이 설정되지 않았습니다.' });
 
   const url = new URL(req.url, 'http://x');
-  const sheet = url.searchParams.get('sheet') === '주간' ? '주간' : '데일리';
+  const asked = url.searchParams.get('sheet');
+  const sheet = ['주간', '자동 브리핑', '산업 이슈', '기업 분석'].includes(asked) ? asked : '데일리';
   const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '30', 10) || 30, 1), 200);
 
   const target = new URL(hook);

@@ -18,7 +18,7 @@ function item(value, steps, unit, source, end) {
   const isRate = unit === 'bp';
   const vals = [value];
   let v = value;
-  for (let i = 0; i < 24; i++) {
+  for (let i = 0; i < 129; i++) {
     const s = steps[i % steps.length];
     v = isRate ? v - s / 100 : unit === '$' ? v - s : v / (1 + s / 100);
     vals.unshift(Number(v.toFixed(4)));

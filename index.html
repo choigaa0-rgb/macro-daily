@@ -28,7 +28,11 @@
   </header>
 
   <nav class="tabs" role="tablist">
-    <button class="tab active" data-tab="daily" role="tab">매일 점검</button>
+    <button class="tab active" data-tab="brief" role="tab">오늘의 브리핑</button>
+    <button class="tab" data-tab="industry" role="tab">산업 이슈</button>
+    <button class="tab" data-tab="company" role="tab">오늘의 기업</button>
+    <button class="tab" data-tab="daily" role="tab">매일 점검</button>
+    <button class="tab" data-tab="center" role="tab">AI 리서치센터</button>
     <button class="tab" data-tab="event" role="tab">이벤트일</button>
     <button class="tab" data-tab="weekly" role="tab">주간 점검</button>
     <button class="tab" data-tab="records" role="tab">기록</button>
@@ -38,12 +42,32 @@
 
   <main>
     <!-- 매일 점검 -->
-    <section class="view active" id="view-daily">
+    <!-- 오늘의 브리핑 -->
+    <section class="view active" id="view-brief">
+      <div class="brief-wrap" id="briefPanel"></div>
+    </section>
+
+    <!-- 산업 이슈 -->
+    <section class="view" id="view-industry">
+      <div class="brief-wrap" id="industryPanel"></div>
+    </section>
+
+    <!-- 오늘의 기업 -->
+    <section class="view" id="view-company">
+      <div class="brief-wrap" id="companyPanel"></div>
+    </section>
+
+    <section class="view" id="view-daily">
       <div class="overview" id="overview"></div>
       <div class="layout">
         <div class="col-main" id="dailySections"></div>
         <aside class="col-side" id="conclusionPanel"></aside>
       </div>
+    </section>
+
+    <!-- AI 리서치센터 -->
+    <section class="view" id="view-center">
+      <div id="centerPanel"></div>
     </section>
 
     <!-- 이벤트일 -->
@@ -63,7 +87,7 @@
   </main>
 
   <footer class="foot">
-    시장 데이터: 미국 재무부, Yahoo Finance, FRED, 한국은행 ECOS · 값은 각 지표의 최근 거래일 종가 기준 · 투자 권유가 아닌 학습용 도구입니다.
+    데이터: 미국 재무부, Yahoo Finance, FRED, 한국은행 ECOS, DART, SEC EDGAR, 언론사 RSS(제목·링크) · 값은 각 지표의 최근 거래일 종가 기준 · 투자 권유가 아닌 학습용 도구입니다.
   </footer>
 
   <dialog id="settingsDialog">
