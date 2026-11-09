@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Macro Daily | 데일리 매크로 점검</title>
+  <meta name="description" content="금리 → 달러 → 주식 → 원자재 → 위험 → 정책 → 데이터 → 한국 순서로 매일 매크로를 점검하고 결론을 기록하는 대시보드" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2316202e'/%3E%3Cpolyline points='6,22 12,15 17,18 26,9' fill='none' stroke='%23fffdf9' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">MD</span>
+      <div>
+        <div class="brand-title">Macro Daily</div>
+        <div class="brand-sub">확인 → 해석 → 한국 전이 → 결론</div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <label class="date-pick">점검일 <input type="date" id="checkDate" /></label>
+      <button class="btn ghost" id="refreshBtn" title="데이터 다시 불러오기">↻ 데이터</button>
+      <button class="btn ghost" id="settingsBtn" title="설정">설정</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="daily" role="tab">매일 점검</button>
+    <button class="tab" data-tab="event" role="tab">이벤트일</button>
+    <button class="tab" data-tab="weekly" role="tab">주간 점검</button>
+    <button class="tab" data-tab="records" role="tab">기록</button>
+  </nav>
+
+  <div id="statusBar" class="status-bar"></div>
+
+  <main>
+    <!-- 매일 점검 -->
+    <section class="view active" id="view-daily">
+      <div class="overview" id="overview"></div>
+      <div class="layout">
+        <div class="col-main" id="dailySections"></div>
+        <aside class="col-side" id="conclusionPanel"></aside>
+      </div>
+    </section>
+
+    <!-- 이벤트일 -->
+    <section class="view" id="view-event">
+      <div class="panel" id="eventPanel"></div>
+    </section>
+
+    <!-- 주간 -->
+    <section class="view" id="view-weekly">
+      <div id="weeklyPanel"></div>
+    </section>
+
+    <!-- 기록 -->
+    <section class="view" id="view-records">
+      <div class="panel" id="recordsPanel"></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    시장 데이터: Yahoo Finance, FRED, 한국은행 ECOS · 값은 각 지표의 최근 거래일 종가 기준 · 투자 권유가 아닌 학습용 도구입니다.
+  </footer>
+
+  <dialog id="settingsDialog">
+    <form method="dialog" class="settings">
+      <h3>설정</h3>
+      <label>앱 비밀번호 (Vercel의 APP_PASSCODE)
+        <input type="password" id="setPasscode" autocomplete="off" />
+      </label>
+      <label>구글 시트 주소 (기록 탭의 '시트 열기' 버튼용)
+        <input type="url" id="setSheetUrl" placeholder="https://docs.google.com/spreadsheets/..." />
+      </label>
+      <label class="inline"><input type="checkbox" id="setMock" /> 목업 데이터로 보기 (화면 테스트용)</label>
+      <div class="dialog-actions">
+        <button class="btn" value="cancel">닫기</button>
+        <button class="btn primary" id="saveSettings" value="save">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="config.js"></script>
+  <script src="signals.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

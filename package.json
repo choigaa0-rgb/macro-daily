@@ -1,0 +1,13 @@
+{
+  "name": "macro-daily-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "데일리 매크로 점검 루틴 대시보드 (Vercel + 구글 시트 + Gemini)",
+  "scripts": {
+    "dev": "node tests/dev-server.js",
+    "test": "node tests/signals.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
