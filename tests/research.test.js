@@ -61,8 +61,8 @@ global.fetch = async (url, opts = {}) => {
   if (u.includes('generativelanguage')) {
     const out = geminiMode === 'industry'
       ? { headline: '반도체 강세, 자동차 관세 부담', issues: [
-        { sector: 'IT', industry: '반도체', region: '공통', kospi_sector: '전기전자', title: 'HBM 공급 확대', summary: 's', why: 'w', impact: '긍정', macro_link: '', companies: ['삼성전자', 'SK하이닉스'], sources: [1, 3] },
-        { sector: '경기소비재', industry: '자동차', region: '이상한값', kospi_sector: '운송장비·부품', title: '관세 영향', summary: 's', why: 'w', impact: '부정', macro_link: '', companies: ['현대차'], sources: [2] },
+        { sector: 'IT', industry: '반도체', region: '공통', kospi_sector: '전기전자', title: 'HBM 공급 확대', summary: 's', why: 'w', impact: '긍정', macro_link: '복사된 문장', companies: ['삼성전자', 'SK하이닉스'], sources: [1, 3] },
+        { sector: '경기소비재', industry: '자동차', region: '이상한값', kospi_sector: '운송장비·부품', title: '관세 영향', summary: 's', why: 'w', impact: '부정', macro_link: '복사된 문장', companies: ['현대차'], sources: [2] },
         { industry: '가짜', title: '근거 없음', summary: 's', why: 'w', impact: '중립', companies: [], sources: [99] }] }
       : { one_liner: '메모리 반도체 1위', why_today: '1일 6% 상승, 거래량 5배', business: 'b', segments: ['메모리'], competitors: ['SK하이닉스'],
         results: '2025 매출 300조원, 영업이익 증가율 438.5%', valuation: 'PER 12.1배, PBR 1.0배 수준이며 영업이익률 25%', macro_link: '', bull: ['HBM'], bear: ['가격'], kill_scenario: 'k', checkpoints: ['실적'] };
@@ -94,6 +94,7 @@ function call(handler, url, method = 'GET', body) {
   assert.strictEqual(iss[1].check, '근거 확인');
   assert.deepStrictEqual([iss[0].sector, iss[0].region, iss[0].kospi_sector], ['기술', '공통', '전기·전자'], '목록 밖 태그는 목록 안으로 맞춤');
   assert.deepStrictEqual([iss[1].sector, iss[1].region], ['경기소비재', '국내']);
+  assert.strictEqual(iss[0].macro_link, '', '여러 이슈에 같은 매크로 문장을 붙이면 비움');
   assert.ok(posted.find((p) => p.sheet === '산업 이슈'));
   fs.writeFileSync(path.join(outDir, 'industry-mail.html'), r.body.mailHtml);
   console.log('ok - 산업 이슈: 근거 없는 이슈 제거, 관련 기업 대조, 시트 저장');

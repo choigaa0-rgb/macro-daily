@@ -1048,13 +1048,14 @@
     const out = [];
     if (it.region !== '국내' && it.sector && S0.us && S0.us.ok) {
       const r = S0.us.rows.find((x) => x.ko === it.sector);
-      if (r && r.d1 != null) out.push(['미국 ' + r.ko, r.d1]);
+      if (r && r.d1 != null) out.push(['미국 ' + r.ko, r.d1, S0.us.date]);
     }
     if (it.region !== '해외' && it.kospi_sector && S0.kr && S0.kr.ok) {
       const r = S0.kr.rows.find((x) => nm(x.name) === nm(it.kospi_sector));
-      if (r && r.d1 != null) out.push(['코스피 ' + r.name, r.d1]);
+      if (r && r.d1 != null) out.push(['코스피 ' + r.name, r.d1, S0.kr.date]);
     }
-    return out.map(([l, v]) => `<span class="mv-tag ${v > 0 ? 'up' : v < 0 ? 'down' : ''}" title="그날 섹터 등락">${esc(l)} ${signed(v, 2, '%')}</span>`).join('');
+    const md = (d) => (d ? `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}` : '');
+    return out.map(([l, v, d]) => `<span class="mv-tag ${v > 0 ? 'up' : v < 0 ? 'down' : ''}" title="${esc(d || '')} 종가 기준 섹터 등락. 뉴스보다 앞선 날일 수 있어요">${esc(l)} ${md(d)} ${signed(v, 2, '%')}</span>`).join('');
   }
   function renderIndustry() {
     const box = $('#industryPanel');

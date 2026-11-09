@@ -27,7 +27,7 @@ const PROMPT = `너는 한국 증권사 리서치센터의 산업 애널리스�
    - region: 국내(한국 기업·한국 시장 이야기) | 해외(외국 기업·외국 시장 이야기) | 공통(해외 사건이 한국 기업에 바로 영향, 예: 엔비디아 실적 → 국내 반도체)
    - kospi_sector: region이 국내·공통이면 다음 코스피 업종 중 가장 가까운 하나, 해외면 빈 문자열 → {KOSPI}
 4. 관련 기업은 근거 기사에 이름이 나온 상장사만 적는다.
-5. 매크로 연결은 주어진 '오늘의 매크로' 내용과 이어서 한 문장으로. 매크로 정보가 없으면 빈 문자열.
+5. macro_link는 '이 이슈'와 특정 매크로 변수(금리, 환율, 유가, 물가, 경기, 수급 중 하나 이상)가 어떻게 이어지는지 한 문장으로. 이슈마다 다르게 쓰고, headline이나 '오늘의 매크로' 문장을 그대로 옮기지 않는다. 뚜렷한 연결이 없으면 빈 문자열.
 6. 투자 권유·매수 추천은 하지 않는다. 한국어, 짧은 문장. JSON 하나만 출력한다.
 출력:
 { "headline": "오늘 산업 이슈 한 줄 요약",
@@ -46,7 +46,12 @@ function fixTags(it, kospiList) {
 }
 
 function verifyIssues(issues, news, kospiList = KOSPI_DEFAULT) {
-  return (issues || []).map((raw) => {
+  // 같은 매크로 문장을 여러 이슈에 복사해 붙인 경우는 연결이 아니므로 비움
+  const mk = (x) => String(x || '').replace(/\s/g, '');
+  const cnt = {};
+  (issues || []).forEach((it) => { const k = mk(it.macro_link); if (k) cnt[k] = (cnt[k] || 0) + 1; });
+  return (issues || []).map((raw0) => {
+    const raw = cnt[mk(raw0.macro_link)] >= 2 ? Object.assign({}, raw0, { macro_link: '' }) : raw0;
     const it = Object.assign({}, raw, fixTags(raw, kospiList));
     const srcs = (it.sources || []).map((n) => news[Number(n) - 1]).filter(Boolean);
     const text = srcs.map((s) => `${s.title} ${s.desc || ''}`).join(' ');
