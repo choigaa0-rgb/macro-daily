@@ -36,6 +36,17 @@ http.createServer(async (req, res) => {
     return end(res, { ok: true, rows });
   }
 
+  // 로컬에서는 Gemini에 접속할 수 없을 때 가짜 AI 응답으로 화면만 확인
+  if (!process.env.GEMINI_API_KEY && (url.pathname === '/api/analyze' || url.pathname === '/api/compare')) {
+    let raw = '';
+    for await (const c of req) raw += c;
+    const b = JSON.parse(raw || '{}');
+    const text = url.pathname === '/api/compare'
+      ? `## 리포트 핵심 (3줄)\n- (테스트) PDF ${b.pdfBase64 ? '있음' : '없음'}, 붙여넣기 ${b.reportText ? b.reportText.length + '자' : '없음'}\n## 같은 점\n- 테스트 응답입니다\n## 다른 점\n- 테스트 응답입니다`
+      : '## 오늘의 동인\n테스트 응답입니다.\n## 내 결론에 대한 피드백\n- 테스트';
+    return end(res, { ok: true, model: 'local-test', text });
+  }
+
   if (url.pathname.startsWith('/api/')) {
     const name = url.pathname.slice(5).replace(/[^a-z]/g, '');
     const file = path.join(ROOT, 'api', name + '.js');

@@ -191,6 +191,42 @@
     return { date, latest, mismatch: date !== latest, items: out };
   }
 
+  // ---------- 결론 가이드용 ----------
+  // 평소 하루 변동폭(경험적 참고치). 변화 ÷ 평소 변동폭이 클수록 '오늘 크게 움직인 것'
+  const TYPICAL = {
+    us2y: 6, us10y: 6, t10y2y: 5, dxy: 0.4, usdkrw: 0.5, usdjpy: 0.6,
+    dow: 0.7, spx: 0.8, ndx: 1.1, rut: 1.3, sox: 2, wti: 2, brent: 2, gold: 1, copper: 1.3, vix: 7,
+    kospi: 1, kosdaq: 1.2, kr3y: 4, kr10y: 5,
+  };
+  function topMovers(items, n = 3) {
+    const A = align(items);
+    const src = Object.assign({}, A.items, { kospi: items.kospi, kosdaq: items.kosdaq, usdkrw: items.usdkrw, kr3y: items.kr3y, kr10y: items.kr10y });
+    return Object.keys(TYPICAL)
+      .map((id) => ({ id, chg: c(src, id), unit: src[id] && src[id].chgUnit, score: c(src, id) == null ? 0 : Math.abs(c(src, id)) / TYPICAL[id] }))
+      .filter((x) => x.chg != null && x.score >= 0.8)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, n);
+  }
+
+  // ② 어떤 이야기인가: 자동 신호로 추천
+  function recommendStory(sig) {
+    const sr = sig.stockRate, cv = sig.curve, dc = sig.decompose, vx = sig.vix;
+    if (!sr) return null;
+    const why = [`주식×금리 조합: ${sr.name}`];
+    if (cv) why.push(`커브: ${cv.name}`);
+    let pick;
+    if (sr.name === '좋은 금리 상승') pick = '성장';
+    else if (sr.name === '나쁜 금리 상승') {
+      if (dc && dc.name.startsWith('기대인플레')) { pick = '물가'; why.push(`10년물 분해: ${dc.name}`); }
+      else pick = cv && cv.name.includes('플래트닝') ? '정책' : '물가';
+    } else if (sr.name === '골디락스') pick = '정책';
+    else if (sr.name === '위험 회피') {
+      if (vx && (vx.name === '변동성 확대' || vx.name === '위험 회피 심화')) { pick = '위험 회피·지정학'; why.push(`VIX: ${vx.name}`); }
+      else pick = '성장';
+    } else pick = '뚜렷한 동인 없음';
+    return { pick, why };
+  }
+
   function all(items) {
     const A = align(items);
     const us = A.items;
@@ -214,5 +250,5 @@
     };
   }
 
-  return { curve, stockRate, alignment, decompose, vixRegime, hyRegime, dollar, korea, phase, flags, align, all };
+  return { curve, stockRate, alignment, decompose, vixRegime, hyRegime, dollar, korea, phase, flags, align, all, topMovers, recommendStory };
 });

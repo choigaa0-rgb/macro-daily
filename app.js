@@ -87,6 +87,7 @@
     const d = collect($('#view-daily'));
     Object.assign(d, collect($('#view-event')));
     d.__ai = state.aiText;
+    d.__cmp = state.cmpText || '';
     store.set(draftKey(), d);
     store.set(weekKey(), collect($('#view-weekly')));
     updateProgress();
@@ -233,22 +234,45 @@
   }
 
   // ---------- 결론 패널 ----------
+  const STORY_OPTS = ['', '성장', '물가', '정책', '위험 회피·지정학', '실적·개별 이슈', '뚜렷한 동인 없음'];
+  const PHASE_OPTS = ['', '골디락스 쪽', '리플레이션 쪽', '침체·디스인플레이션 쪽', '스태그플레이션 우려 쪽', '판단 보류'];
+  const guidesOpen = () => store.get('md-guides-open', true);
+  const guide = (id, title) => `<details class="guide"${guidesOpen() ? ' open' : ''}><summary>${title}</summary><div class="g-body" id="${id}"></div></details>`;
+
   function renderConclusion() {
     $('#conclusionPanel').innerHTML = `
       <div class="card concl">
-        <h2>오늘의 결론</h2>
-        <p class="hint">1~8을 확인한 뒤, AI를 보기 전에 <b>내 결론부터</b> 씁니다.</p>
-        <label class="fld wide"><span>① 오늘의 동인 — 무엇이 시장을 움직였나</span><textarea data-key="오늘의 동인" rows="2" placeholder="예: 미국 CPI 서프라이즈로 2년물 급등"></textarea></label>
-        <label class="fld wide"><span>② 어떤 이야기인가</span>
-          <select data-key="이야기">${['', '성장', '물가', '정책', '위험 회피·지정학', '실적·개별 이슈', '뚜렷한 동인 없음'].map((o) => `<option value="${o}">${o || '선택'}</option>`).join('')}</select></label>
-        <label class="fld wide"><span>③ 한국 전이</span><input type="text" data-key="한국 영향" placeholder="예: 원달러 +10원, 외국인 매도로 KOSPI 약세" /></label>
+        <div class="concl-head"><h2>오늘의 결론</h2><button class="btn mini ghost" id="toggleGuides" type="button">${guidesOpen() ? '가이드 모두 접기' : '가이드 모두 펴기'}</button></div>
+        <p class="hint">1~8을 확인한 뒤, AI를 보기 전에 <b>내 결론부터</b> 씁니다. 각 칸의 가이드는 오늘 데이터에 맞춰 바뀝니다.</p>
+
+        <div class="fld wide"><span>① 오늘의 동인 — 무엇이 시장을 움직였나</span>
+          ${guide('g1', '가이드: 가장 크게 움직인 것 찾기')}
+          <textarea data-key="오늘의 동인" rows="2" placeholder="[무엇이] [얼마나] — [왜]"></textarea></div>
+
+        <div class="fld wide"><span>② 어떤 이야기인가</span>
+          ${guide('g2', '가이드: 성장 / 물가 / 정책 구분하기')}
+          <select data-key="이야기">${STORY_OPTS.map((o) => `<option value="${o}">${o || '선택'}</option>`).join('')}</select></div>
+
+        <div class="fld wide"><span>③ 한국 전이</span>
+          ${guide('g3', '가이드: 한국으로 어떻게 넘어왔나')}
+          <input type="text" data-key="한국 영향" placeholder="[한국 시장 움직임] — [경로: 금리·달러 / 반도체] — [다르다면 이유]" /></div>
+
         <div class="fld wide"><span>④ 국면 신호 <em class="auto-phase" id="autoPhase"></em></span>
-          <select data-key="국면 판단">${['', '골디락스 쪽', '리플레이션 쪽', '침체·디스인플레이션 쪽', '스태그플레이션 우려 쪽', '판단 보류'].map((o) => `<option value="${o}">${o || '선택'}</option>`).join('')}</select></div>
+          ${guide('g4', '가이드: 어느 국면으로 기울었나')}
+          <select data-key="국면 판단">${PHASE_OPTS.map((o) => `<option value="${o}">${o || '선택'}</option>`).join('')}</select></div>
+
         <div class="fld wide"><span>⑤ 기존 뷰 대비</span>
+          ${guide('g5', '가이드: 지난 결론과 비교하기')}
           <div class="seg">${['유지', '강화', '약화', '수정'].map((o) => `<label><input type="radio" name="view" value="${o}" /><span>${o}</span></label>`).join('')}</div>
           <input type="hidden" data-key="뷰 변화" id="viewHidden" /></div>
-        <label class="fld wide"><span>⑥ 다음 체크포인트</span><input type="text" data-key="다음 체크포인트" placeholder="예: 목요일 PPI, 파월 의장 발언" /></label>
-        <label class="fld wide"><span>종합 해석 (3~5문장)</span><textarea data-key="종합 해석" rows="5" placeholder="동인 → 해석 → 한국 영향 → 국면 신호 → 뷰 변화와 다음 확인 포인트"></textarea></label>
+
+        <div class="fld wide"><span>⑥ 다음 체크포인트</span>
+          ${guide('g6', '가이드: 내 해석을 확인해줄 다음 이벤트')}
+          <input type="text" data-key="다음 체크포인트" placeholder="[이벤트] — [이렇게 나오면 뷰 강화 / 저렇게 나오면 수정]" /></div>
+
+        <div class="fld wide"><span>종합 해석 (3~5문장)</span>
+          ${guide('g7', '가이드: ①~⑥을 문장으로 잇기')}
+          <textarea data-key="종합 해석" rows="6" placeholder="동인 → 해석 → 한국 영향 → 국면 신호 → 뷰 변화와 다음 확인 포인트"></textarea></div>
 
         <div class="ai-block">
           <div class="ai-head"><h3>AI 종합분석</h3><button class="btn" id="aiBtn">AI 분석 받기</button></div>
@@ -258,14 +282,227 @@
 
         <div class="report-block">
           <h3>증권사 리포트와 비교</h3>
-          <p class="hint"><a href="https://consensus.hankyung.com/analysis/list?skinType=market" target="_blank" rel="noopener">한경컨센서스 시장 리포트 ↗</a>에서 데일리를 찾아 비교합니다.</p>
+          <ol class="steps">
+            <li><a href="https://consensus.hankyung.com/analysis/list?skinType=market" target="_blank" rel="noopener">한경컨센서스 시장 리포트 ↗</a>에서 오늘 날짜의 데일리·시황 리포트를 하나 고릅니다.</li>
+            <li>PDF를 내려받아 아래에 올리거나, 핵심 부분을 복사해 붙여넣습니다.</li>
+            <li><b>AI로 비교하기</b>를 누르면 내 결론과 비교해 정리해 줍니다.</li>
+          </ol>
           <label class="fld wide"><span>참고 리포트</span><input type="text" data-key="참고 리포트" placeholder="증권사 · 리포트 제목" /></label>
-          <label class="fld wide"><span>리포트 비교 메모</span><textarea data-key="리포트 비교 메모" rows="3" placeholder="같은 점 / 다른 점 / 리포트만의 인사이트 / 내가 놓친 것"></textarea></label>
+          <div class="fld wide"><span>리포트 PDF (3MB 이하)</span>
+            <div class="file-row"><input type="file" id="reportFile" accept="application/pdf" /><button class="btn ghost" id="clearFile" type="button">지우기</button></div></div>
+          <label class="fld wide"><span>또는 리포트 내용 붙여넣기</span><textarea id="reportText" rows="4" placeholder="리포트의 결론·전망 부분을 붙여넣으세요. (붙여넣은 원문은 시트에 저장하지 않습니다)"></textarea></label>
+          <button class="btn block-soft" id="compareBtn" type="button">AI로 비교하기</button>
+          <div class="ai-out" id="cmpOut"><span class="muted">리포트를 올리고 비교를 누르세요.</span></div>
+          <label class="fld wide"><span>리포트 비교 메모 (내 말로 정리)</span><textarea data-key="리포트 비교 메모" rows="3" placeholder="같은 점 / 다른 점 / 리포트만의 인사이트 / 내가 놓친 것 / 내가 더 깊게 본 것"></textarea></label>
         </div>
 
         <button class="btn primary block" id="saveDaily">구글 시트에 저장</button>
         <div class="save-note" id="saveNote">같은 날짜로 다시 저장하면 그날 기록을 덮어씁니다.</div>
       </div>`;
+  }
+
+  // ---------- 결론 가이드 (데이터가 바뀔 때마다 다시 그림) ----------
+  function label(id) { return (C.indicators[id] || { label: id }).label; }
+  function moveText(m) {
+    const d = m.unit === 'bp' ? 1 : 2;
+    const u = m.unit === 'bp' ? 'bp' : m.unit === '%' ? '%' : m.unit || '%';
+    return `${label(m.id)} ${signed(m.chg, d, u)}`;
+  }
+  function fieldVal(key) { const el = $(`[data-key="${key}"]`); return el ? el.value.trim() : ''; }
+  function setField(key, val, mode) {
+    const el = $(`[data-key="${key}"]`);
+    if (!el) return;
+    if (mode === 'append' && el.value.trim()) el.value = el.value.trim() + '\n' + val;
+    else el.value = val;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.focus();
+  }
+  function previousRecord() {
+    // 이 브라우저에 남은 이전 날짜 초안 중 가장 최근 것 (없으면 시트 기록)
+    let best = null;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || !k.startsWith('md-draft-')) continue;
+        const d = k.slice(9);
+        if (d >= state.date) continue;
+        const v = store.get(k, {});
+        if (!v['종합 해석'] && !v['뷰 변화'] && !v['오늘의 동인']) continue;
+        if (!best || d > best.date) best = { date: d, rec: v };
+      }
+    } catch (e) { /* 저장소 사용 불가 */ }
+    if (!best && state.records) {
+      const r = state.records.find((x) => x['날짜'] < state.date);
+      if (r) best = { date: r['날짜'], rec: r };
+    }
+    return best;
+  }
+
+  function renderGuides() {
+    if (!$('#g1')) return;
+    const items = state.market ? state.market.items : null;
+    const sig = state.signals || {};
+    const noData = '<p class="muted">데이터를 불러오면 오늘 기준 가이드가 나옵니다.</p>';
+
+    // ①
+    const movers = items ? S.topMovers(items) : [];
+    $('#g1').innerHTML = `
+      <p><b>1단계. 오늘 평소보다 크게 움직인 것</b> <span class="muted">(평소 하루 변동폭 대비 큰 순서)</span></p>
+      ${movers.length ? `<div class="chips">${movers.map((m) => `<span class="chip ${m.chg > 0 ? 'bad' : 'info'}">${esc(moveText(m))}</span>`).join('')}</div>
+        <button class="btn mini" data-act="fill-movers" type="button">동인 칸에 넣기</button>` : (items ? '<p class="muted">평소보다 크게 움직인 자산이 없습니다. "뚜렷한 동인 없이 기존 흐름 연장"도 좋은 결론입니다.</p>' : noData)}
+      <p><b>2단계. 왜 움직였는지 찾기</b> (위에서부터 순서대로)</p>
+      <ol>
+        <li>07 발표 지표: 예상보다 높거나 낮게 나온 지표가 있었나?</li>
+        <li>06 통화정책: 연준 위원 발언이나 FedWatch 확률 변화가 있었나?</li>
+        <li>03 주식 섹터·대형주: 특정 기업 실적이나 업종 이슈인가?</li>
+        <li>뉴스 검색: "<i>${movers[0] ? esc(label(movers[0].id)) : '자산명'} 급등(급락) 이유</i>" 처럼 찾아보기</li>
+      </ol>
+      <p><b>3단계. 쓰는 형식</b> [무엇이] [얼마나] — [왜]. 원인을 못 찾았으면 "원인 확인 필요"라고 남겨도 됩니다.</p>`;
+
+    // ②
+    const rec = state.signals ? S.recommendStory(sig) : null;
+    $('#g2').innerHTML = `
+      ${rec ? `<p class="rec">자동 추천: <b>${esc(rec.pick)}</b> <span class="muted">근거: ${esc(rec.why.join(' · '))}</span>
+        <button class="btn mini" data-act="apply-story" data-val="${esc(rec.pick)}" type="button">추천 적용</button></p>` : noData}
+      <table class="g-table">
+        <tr><th>성장</th><td>금리↑·주가↑(좋은 금리 상승), 구리·러셀 강세, 경기 지표 서프라이즈</td></tr>
+        <tr><th>물가</th><td>기대인플레(BEI)·유가가 금리 상승을 주도, 물가 지표 서프라이즈</td></tr>
+        <tr><th>정책</th><td>2년물이 주도(플래트닝·불 스티프닝), FedWatch 확률 변화, 연준 발언</td></tr>
+        <tr><th>위험 회피</th><td>VIX 20↑, 금·엔화 강세, 하이일드 스프레드 확대</td></tr>
+      </table>
+      <p class="muted">추천은 규칙에 따른 참고입니다. 뉴스로 확인한 원인이 다르면 내 판단을 고르세요.</p>`;
+
+    // ③
+    const it = (id) => (items && items[id] && items[id].ok ? items[id] : null);
+    const kospi = it('kospi'), krw = it('usdkrw'), kr10 = it('kr10y'), us10 = it('us10y');
+    const soxA = state.signals && items ? S.align(items).items.sox : null;
+    const foreign = fieldVal('외국인 순매수 KOSPI(억원)');
+    if (items) {
+      const krwWon = krw && krw.prev != null ? krw.value - krw.prev : null;
+      const facts = [];
+      if (kospi) facts.push(`KOSPI ${signed(kospi.chg, 2, '%')}`);
+      if (soxA && soxA.ok) facts.push(`미국 반도체 ${signed(soxA.chg, 2, '%')}`);
+      if (krwWon != null) facts.push(`원달러 ${signed(krwWon, 1, '원')} (${krwWon > 0 ? '원화 약세' : krwWon < 0 ? '원화 강세' : '보합'})`);
+      facts.push(`외국인 ${foreign ? `${Number(foreign).toLocaleString('ko-KR')}억원` : '(08에서 입력)'}`);
+      if (kr10 && us10) facts.push(`국고채 10년 ${signed(kr10.chg, 1, 'bp')} vs 미국 10년 ${signed(us10.chg, 1, 'bp')}`);
+      state.krFacts = facts.join(', ');
+      $('#g3').innerHTML = `
+        <p><b>오늘의 사실</b> ${sig.korea ? `<span class="badge ${sig.korea.tone}">${esc(sig.korea.name)}</span>` : ''}</p>
+        <p class="mono-sm">${esc(state.krFacts)}</p>
+        <button class="btn mini" data-act="fill-korea" type="button">사실 넣기</button>
+        <p><b>확인할 질문</b></p>
+        <ol>
+          <li>금리·달러 경로: 원화가 약해졌나? 외국인이 팔았나?</li>
+          <li>반도체 경로: 미국 반도체 방향과 KOSPI 방향이 같았나?</li>
+          <li>다르다면: 반도체 말고 어떤 업종이 지수를 끌어내렸나(올렸나)? 국내 정책·정치·중국 이슈는?</li>
+        </ol>`;
+    } else $('#g3').innerHTML = noData;
+
+    // ④
+    const ph = sig.phase;
+    $('#g4').innerHTML = ph ? `
+      <p class="rec">자동 참고: <b>${esc(ph.name)}</b> <span class="muted">${esc(ph.detail || ph.meaning)}</span>
+        ${PHASE_OPTS.includes(ph.name) ? `<button class="btn mini" data-act="apply-phase" data-val="${esc(ph.name)}" type="button">추천 적용</button>` : ''}</p>
+      <table class="g-table quad">
+        <tr><th></th><th>물가↓</th><th>물가↑</th></tr>
+        <tr><th>성장↑</th><td>골디락스</td><td>리플레이션</td></tr>
+        <tr><th>성장↓</th><td>침체·디스인플레이션</td><td>스태그플레이션</td></tr>
+      </table>
+      <p class="muted">하루 데이터로 국면이 바뀌지는 않습니다. "오늘은 어느 쪽으로 기울었나"만 고르고, 3일 이상 같은 쪽이 나오면 의미 있는 변화로 봅니다.</p>` : noData;
+
+    // ⑤
+    const prev = previousRecord();
+    $('#g5').innerHTML = `
+      ${prev ? `<div class="prev"><b>지난 결론 (${esc(prev.date)})</b> ${prev.rec['뷰 변화'] ? `· ${esc(prev.rec['뷰 변화'])}` : ''} ${prev.rec['국면 판단'] ? `· ${esc(prev.rec['국면 판단'])}` : ''}
+        <div class="muted">${esc((prev.rec['종합 해석'] || prev.rec['오늘의 동인'] || '').slice(0, 160))}</div></div>`
+        : '<p class="muted">비교할 지난 결론이 없습니다. 오늘은 <b>유지</b>를 고르고, 종합 해석에 "내 기본 뷰"를 한 줄 적어 두세요. 그게 내일의 기준이 됩니다.</p>'}
+      <table class="g-table">
+        <tr><th>유지</th><td>오늘 데이터가 기존 뷰와 맞거나 의미 있는 변화가 없음</td></tr>
+        <tr><th>강화</th><td>기존 뷰를 뒷받침하는 근거가 하나 더 생김</td></tr>
+        <tr><th>약화</th><td>기존 뷰와 다른 신호가 나왔지만 아직 하나뿐</td></tr>
+        <tr><th>수정</th><td>여러 지표가 같은 방향으로 기존 뷰와 반대를 가리킴</td></tr>
+      </table>`;
+
+    // ⑥
+    const story = fieldVal('이야기') || (rec && rec.pick) || '';
+    const nextMap = {
+      성장: '고용(NFP·신규실업수당청구), ISM, 소매판매, GDPNow 변화',
+      물가: 'CPI·PPI·PCE, 기대인플레(BEI), 유가',
+      정책: 'FOMC, 연준 위원 발언, FedWatch 확률 변화, 2년물',
+      '위험 회피·지정학': 'VIX, 하이일드 스프레드, 관련 뉴스 후속 보도',
+    };
+    $('#g6').innerHTML = `
+      <p>내 해석이 <b>맞는지 확인하거나 뒤집을 수 있는</b> 이벤트를 고릅니다.</p>
+      ${story && nextMap[story] ? `<p class="rec">"${esc(story)}" 이야기라면: <b>${esc(nextMap[story])}</b></p>` : ''}
+      <p>한국은 <b>외국인 순매수 지속 여부</b>, <b>수출 데이터(매월 1일·11일·21일경)</b>, 금통위를 함께 봅니다.</p>
+      <p>형식: [이벤트] — [이렇게 나오면 뷰 강화 / 저렇게 나오면 수정] · <a href="https://kr.investing.com/economic-calendar/" target="_blank" rel="noopener">경제 캘린더 ↗</a></p>`;
+
+    // 종합 해석
+    $('#g7').innerHTML = `
+      <ol>
+        <li><b>동인</b>: 오늘 무엇이 시장을 움직였나 (①)</li>
+        <li><b>해석</b>: 그건 어떤 이야기이고, 근거가 된 자산 움직임은 (②)</li>
+        <li><b>한국</b>: 한국에는 어떻게 넘어왔나 (③)</li>
+        <li><b>국면·뷰</b>: 어느 쪽으로 기울었고, 내 뷰는 어떻게 되나 (④⑤)</li>
+        <li><b>다음</b>: 무엇으로 확인할 건가 (⑥)</li>
+      </ol>
+      <button class="btn mini" data-act="fill-summary" type="button">내가 쓴 ①~⑥으로 틀 만들기</button>
+      <span class="muted">틀을 만든 뒤 내 말로 다듬으세요.</span>`;
+  }
+
+  function guideAction(act, val) {
+    if (act === 'fill-movers') {
+      const movers = S.topMovers(state.market.items);
+      setField('오늘의 동인', `${movers.map(moveText).join(', ')} — 원인: `, 'append');
+    } else if (act === 'apply-story') { setField('이야기', val); renderGuides(); }
+    else if (act === 'apply-phase') setField('국면 판단', val);
+    else if (act === 'fill-korea') setField('한국 영향', `${state.krFacts} — 이유: `);
+    else if (act === 'fill-summary') {
+      // 아직 안 채운 '— 원인:' 같은 꼬리표와 끝 마침표는 빼고 문장으로 잇기
+      const f = (k, d) => (fieldVal(k).replace(/\s*—\s*(원인|이유):\s*$/, '').replace(/[.\s]+$/, '')) || d;
+      const sig = state.signals || {};
+      const basis = [sig.stockRate && sig.stockRate.name, sig.curve && sig.curve.name].filter(Boolean).join(', ');
+      const text = `${f('오늘의 동인', '[오늘의 동인]')}. ` +
+        `이는 ${f('이야기', '[이야기]')} 쪽 이야기로 보이며, 근거는 ${basis || '[자산 움직임]'}이다. ` +
+        `한국은 ${f('한국 영향', '[한국 전이]')}. ` +
+        `국면은 ${f('국면 판단', '[국면]')}으로 기울었고, 기존 뷰는 ${f('뷰 변화', '[유지/강화/약화/수정]')}한다. ` +
+        `다음은 ${f('다음 체크포인트', '[체크포인트]')}로 확인한다.`;
+      if (fieldVal('종합 해석') && !confirm('종합 해석에 이미 쓴 내용이 있어요. 틀로 바꿀까요?')) return;
+      setField('종합 해석', text);
+    }
+  }
+
+  // ---------- 리포트 비교 ----------
+  async function runCompare() {
+    const d = collect($('#view-daily'));
+    const concl = conclusionText(d);
+    const text = $('#reportText').value.trim();
+    const file = $('#reportFile').files[0];
+    if (!file && !text) { toast('리포트 PDF를 올리거나 내용을 붙여넣어 주세요', 'err'); return; }
+    if (!concl && !confirm('내 결론이 비어 있어요. 리포트 요약만 받을까요?')) return;
+    let pdf = null;
+    if (file) {
+      if (file.size > 3 * 1024 * 1024) { toast('PDF가 3MB를 넘어요. 핵심 부분을 붙여넣어 주세요', 'err'); return; }
+      pdf = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(String(r.result).split(',')[1]);
+        r.onerror = () => rej(new Error('파일을 읽지 못했습니다'));
+        r.readAsDataURL(file);
+      });
+    }
+    const btn = $('#compareBtn');
+    btn.disabled = true; btn.textContent = '비교 중…';
+    $('#cmpOut').innerHTML = '<span class="muted">AI가 리포트를 읽고 내 결론과 비교하고 있습니다…</span>';
+    try {
+      const j = await api('/api/compare', { method: 'POST', body: JSON.stringify({ date: state.date, reportName: d['참고 리포트'] || '', reportText: text, pdfBase64: pdf, conclusionText: concl, signalsText: signalsText() }) });
+      state.cmpText = j.text;
+      $('#cmpOut').innerHTML = renderMarkdown(j.text) + `<div class="ai-meta">모델: ${esc(j.model)} · 리포트 원문은 저장하지 않고 비교 결과만 저장합니다. <button class="btn mini" data-act="cmp-to-memo" type="button">비교 메모에 옮기기</button></div>`;
+      saveDraft();
+    } catch (e) {
+      $('#cmpOut').innerHTML = `<div class="err">${esc(e.message)}</div>`;
+    } finally {
+      btn.disabled = false; btn.textContent = 'AI로 다시 비교하기';
+    }
   }
 
   // ---------- 이벤트일 ----------
@@ -399,6 +636,7 @@
         <tr data-i="${i}"><td class="mono">${esc(r['날짜'])}</td><td>${esc(r['오늘의 동인'])}</td><td>${esc(r['이야기'])}</td><td>${esc(r['국면 판단'])}</td><td>${esc(r['뷰 변화'])}</td></tr>
         <tr class="rec-detail" hidden><td colspan="5"><div class="rec-body">${esc(r['종합 해석'] || '(종합 해석 없음)')}</div></td></tr>`).join('')}</tbody></table>`;
       renderWeekDaily();
+      renderGuides();
     } catch (e) {
       box.innerHTML = `<div class="err">${esc(e.message)}</div>`;
     }
@@ -450,6 +688,7 @@
     const ph = state.signals && state.signals.phase;
     const ap = $('#autoPhase');
     if (ap) ap.textContent = ph ? `자동 참고: ${ph.name}` : '';
+    renderGuides();
     const weekDraft = keepDom ? Object.assign({}, store.get(weekKey(), {}), collect($('#view-weekly'))) : store.get(weekKey(), {});
     renderWeekly();
     restore($('#view-weekly'), weekDraft);
@@ -557,6 +796,7 @@
       Object.entries(ev).forEach(([k, v]) => { if (!/^이벤트_(체크|메모)_/.test(k) && k !== '이벤트_종류') rec[k] = v; });
     }
     rec['AI 종합분석'] = state.aiText || '';
+    rec['AI 리포트 비교'] = state.cmpText || '';
     return rec;
   }
   async function saveDaily() {
@@ -638,10 +878,29 @@
     document.addEventListener('change', (e) => {
       if (e.target.name === 'view') { $('#viewHidden').value = e.target.value; saveDraft(); }
       else if (e.target.id === 'eventType') { renderEventChecklist(); saveDraft(); }
-      else if (e.target.matches('[data-key]')) saveDraft();
+      else if (e.target.matches('[data-key]')) {
+        saveDraft();
+        if (e.target.dataset.key === '이야기' || e.target.dataset.key.startsWith('외국인')) renderGuides();
+      }
     });
     document.addEventListener('click', (e) => {
+      const act = e.target.closest('[data-act]');
+      if (act) {
+        if (act.dataset.act === 'cmp-to-memo') {
+          const plain = (state.cmpText || '').replace(/^#+\s*/gm, '').replace(/\*\*/g, '');
+          setField('리포트 비교 메모', plain, 'append');
+        } else guideAction(act.dataset.act, act.dataset.val);
+        return;
+      }
       if (e.target.id === 'aiBtn') runAI();
+      else if (e.target.id === 'compareBtn') runCompare();
+      else if (e.target.id === 'toggleGuides') {
+        const open = !guidesOpen();
+        store.set('md-guides-open', open);
+        $$('#conclusionPanel details.guide').forEach((d) => { d.open = open; });
+        e.target.textContent = open ? '가이드 모두 접기' : '가이드 모두 펴기';
+      }
+      else if (e.target.id === 'clearFile') { $('#reportFile').value = ''; }
       else if (e.target.id === 'saveDaily') saveDaily();
       else if (e.target.id === 'saveWeekly') saveWeekly();
       else if (e.target.id === 'loadRecords') loadRecords();
@@ -661,6 +920,8 @@
     if (draft['뷰 변화']) { const r = $(`input[name="view"][value="${draft['뷰 변화']}"]`); if (r) r.checked = true; }
     state.aiText = draft.__ai || '';
     $('#aiOut').innerHTML = state.aiText ? renderMarkdown(state.aiText) : '<span class="muted">아직 분석하지 않았습니다.</span>';
+    state.cmpText = draft.__cmp || '';
+    if (state.cmpText) $('#cmpOut').innerHTML = renderMarkdown(state.cmpText);
     if (fetchData) loadMarket(); else rerenderData(false);
   }
 

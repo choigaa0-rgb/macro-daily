@@ -65,4 +65,20 @@ t('한국: 미국 상승인데 KOSPI 하락', () => {
   assert.ok(k.notes.some((x) => x.includes('10원')));
 });
 
+t('가이드: 평소보다 크게 움직인 것 Top3', () => {
+  const m = S.topMovers(mock.items);
+  assert.ok(m.length >= 1 && m.length <= 3);
+  assert.ok(m[0].score >= m[m.length - 1].score);
+});
+
+t('가이드: 이야기 추천', () => {
+  const sig = S.all(mock.items);
+  const r = S.recommendStory(sig);
+  assert.ok(['성장', '물가', '정책', '위험 회피·지정학', '뚜렷한 동인 없음'].includes(r.pick));
+  assert.ok(r.why.length >= 1);
+  assert.strictEqual(S.recommendStory({ stockRate: { name: '좋은 금리 상승' } }).pick, '성장');
+  assert.strictEqual(S.recommendStory({ stockRate: { name: '나쁜 금리 상승' }, decompose: { name: '기대인플레 주도 상승' } }).pick, '물가');
+  assert.strictEqual(S.recommendStory({ stockRate: { name: '위험 회피' }, vix: { name: '위험 회피 심화' } }).pick, '위험 회피·지정학');
+});
+
 console.log(`\n${n}개 테스트 통과`);
