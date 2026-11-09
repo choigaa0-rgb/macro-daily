@@ -2,7 +2,7 @@
 // "AI의 종합 해석"과 "내 결론과의 비교 피드백"을 받아옵니다.
 // 필요한 환경변수: GEMINI_API_KEY (Google AI Studio에서 무료 발급), GEMINI_MODEL(선택)
 
-const { sendJson, checkPasscode, fetchWithTimeout, readBody } = require('./_lib');
+const { sendJson, checkPasscode, readBody, callGemini } = require('./_lib');
 
 const SYSTEM_PROMPT = `너는 한국 증권사 리서치센터의 시니어 매크로 애널리스트다.
 금융권 취업을 준비하는 경영학부 학생이 매일 수행하는 데일리 매크로 점검 결과를 검토한다.
@@ -35,13 +35,9 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'POST만 가능합니다' });
   if (!checkPasscode(req, res)) return;
 
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return sendJson(res, 500, { ok: false, error: 'GEMINI_API_KEY가 설정되지 않았습니다. README의 4단계를 참고하세요.' });
-
   let body;
   try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { ok: false, error: '요청 형식 오류' }); }
 
-  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   const userText = `점검 날짜: ${body.date || ''}
 
 [자동 수집 데이터]
@@ -56,30 +52,7 @@ ${body.manualText || '(없음)'}
 [학생이 쓴 결론]
 ${body.conclusionText || '(비어 있음)'}`;
 
-  try {
-    const r = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: [{ role: 'user', parts: [{ text: userText }] }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
-        }),
-      },
-      45000
-    );
-    const j = await r.json();
-    if (!r.ok) {
-      const msg = (j.error && j.error.message) || `Gemini 오류 ${r.status}`;
-      return sendJson(res, 502, { ok: false, error: msg });
-    }
-    const parts = (j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
-    const text = parts.map((p) => p.text || '').join('').trim();
-    if (!text) return sendJson(res, 502, { ok: false, error: 'AI 응답이 비어 있습니다. 잠시 후 다시 시도하세요.' });
-    return sendJson(res, 200, { ok: true, model, text });
-  } catch (e) {
-    return sendJson(res, 502, { ok: false, error: `AI 호출 실패: ${e.message}` });
-  }
+  const r = await callGemini({ system: SYSTEM_PROMPT, parts: [{ text: userText }], temperature: 0.4 });
+  if (!r.ok) return sendJson(res, r.status, { ok: false, error: r.error });
+  return sendJson(res, 200, { ok: true, model: r.model, text: r.text });
 };

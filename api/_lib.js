@@ -30,4 +30,62 @@ async function readBody(req) {
   return raw ? JSON.parse(raw) : {};
 }
 
-module.exports = { sendJson, checkPasscode, fetchWithTimeout, readBody };
+// Gemini 호출: 사용량 몰림(429/503)이면 잠시 쉬었다가 다시 시도하고,
+// 그래도 안 되면 GEMINI_FALLBACK_MODEL(설정했을 때)로 한 번 더 시도합니다.
+// Vercel 함수 제한(60초) 안에 끝나도록 시도마다 시간을 나눠 씁니다.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function callGemini({ system, parts, temperature = 0.4, maxOutputTokens = 2048 }) {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return { ok: false, status: 500, error: 'GEMINI_API_KEY가 설정되지 않았습니다.' };
+  const primary = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+  const fallback = process.env.GEMINI_FALLBACK_MODEL;
+  const plan = [
+    { model: primary, wait: 0 },
+    { model: primary, wait: 2500 },
+    { model: fallback || primary, wait: 5000 },
+  ];
+  const started = Date.now();
+  let lastErr = '';
+  for (const step of plan) {
+    if (step.wait) await sleep(step.wait);
+    const left = 55000 - (Date.now() - started);
+    if (left < 8000) break;
+    try {
+      const r = await fetchWithTimeout(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(step.model)}:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: system }] },
+            contents: [{ role: 'user', parts }],
+            generationConfig: { temperature, maxOutputTokens },
+          }),
+        },
+        Math.min(left - 2000, 40000)
+      );
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) {
+        const out = ((j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || []).map((p) => p.text || '').join('').trim();
+        if (out) return { ok: true, model: step.model, text: out };
+        lastErr = 'AI 응답이 비어 있습니다.';
+        continue;
+      }
+      lastErr = (j.error && j.error.message) || `Gemini 오류 ${r.status}`;
+      if (r.status !== 429 && r.status !== 503 && r.status !== 500) return { ok: false, status: 502, error: lastErr };
+    } catch (e) {
+      lastErr = e.message;
+    }
+  }
+  const busy = /high demand|overloaded|unavailable|429|503|quota|rate/i.test(lastErr);
+  return {
+    ok: false,
+    status: 503,
+    error: busy
+      ? 'Gemini에 사용자가 몰려 여러 번 시도했지만 응답을 받지 못했습니다. 몇 분 뒤 다시 눌러주세요. (자주 그러면 README의 GEMINI_FALLBACK_MODEL 설정 참고)'
+      : `AI 호출 실패: ${lastErr}`,
+  };
+}
+
+module.exports = { sendJson, checkPasscode, fetchWithTimeout, readBody, callGemini };

@@ -72,7 +72,8 @@ Vercel 프로젝트 → **Settings → Environment Variables**에 아래를 추�
 | `SHEET_WEBHOOK_URL` | 3단계의 웹 앱 URL |
 | `SHEET_SECRET` | 3단계에서 Code.gs에 적은 SECRET 값 |
 | `APP_PASSCODE` | 대시보드 비밀번호 (주소를 아는 다른 사람이 내 시트에 쓰거나 AI 사용량을 쓰지 못하게) |
-| `GEMINI_MODEL` | (선택) 기본값 `gemini-2.5-flash`. AI Studio에서 쓸 수 있는 최신 무료 모델명으로 바꿀 수 있음 |
+| `GEMINI_MODEL` | (선택) 기본값 `gemini-3.8-flash`. AI Studio에서 쓸 수 있는 최신 무료 모델명으로 바꿀 수 있음 |
+| `GEMINI_FALLBACK_MODEL` | (선택) 기본 모델에 사용자가 몰려 응답이 없을 때 마지막으로 시도할 다른 모델명 (AI Studio에서 쓸 수 있는 가벼운 모델) |
 
 마지막으로 대시보드 **설정**에서 `APP_PASSCODE`와 같은 비밀번호, 시트 주소를 입력하면 끝입니다.
 
