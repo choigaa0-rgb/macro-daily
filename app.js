@@ -101,7 +101,14 @@
   }
 
   // 배경 테마: 초록 그라데이션(기본) 또는 연한 회색
-  function applyBg() { document.documentElement.dataset.bg = settings().bg || 'pro'; }
+  // 색 테마: 설정에서 고름. grey·green은 예전(연두 포인트) 디자인
+  const THEMES = ['pro', 'navy', 'plum', 'ocean', 'charcoal', 'wine', 'grey', 'green'];
+  function setTheme(t) {
+    const v = THEMES.includes(t) ? t : 'pro';
+    document.documentElement.dataset.bg = v;
+    document.documentElement.classList.toggle('themed', v !== 'grey' && v !== 'green');
+  }
+  function applyBg() { setTheme(settings().bg || 'pro'); }
 
   // ---------- 그리기 도우미 ----------
   function sparkline(arr) {
@@ -1614,7 +1621,7 @@
     });
     $('#refreshBtn').addEventListener('click', loadMarket);
     applyBg();
-    document.addEventListener('change', (e) => { if (e.target.name === 'setBg') document.documentElement.dataset.bg = e.target.value; });
+    document.addEventListener('change', (e) => { if (e.target.name === 'setBg') setTheme(e.target.value); });
     $('#settingsBtn').addEventListener('click', () => {
       const s = settings();
       $('#setPasscode').value = s.passcode || '';

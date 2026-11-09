@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-bg="pro">
+<html lang="ko" data-bg="pro" class="themed">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -109,10 +109,17 @@
       <label>구글 시트 주소 (기록 탭의 '시트 열기' 버튼용)
         <input type="url" id="setSheetUrl" placeholder="https://docs.google.com/spreadsheets/..." />
       </label>
-      <div class="bg-pick"><span>색 조합</span>
-        <label><input type="radio" name="setBg" value="pro" /><i class="sw sw-pro"></i>이화 팔레트 (추천)</label>
-        <label><input type="radio" name="setBg" value="grey" /><i class="sw sw-grey"></i>회색 + 연두 포인트</label>
-        <label><input type="radio" name="setBg" value="green" /><i class="sw sw-green"></i>초록 배경 + 연두 포인트</label>
+      <div class="bg-pick"><span>색 테마</span>
+        <div class="theme-grid">
+          <label class="theme-opt"><input type="radio" name="setBg" value="pro" /><i class="sw3" style="--a:#00462a;--b:#36ae92;--c:#f1f3f1"></i><span>이화 그린</span></label>
+          <label class="theme-opt"><input type="radio" name="setBg" value="navy" /><i class="sw3" style="--a:#16223f;--b:#6d8cff;--c:#f2f4f8"></i><span>미드나잇 네이비</span></label>
+          <label class="theme-opt"><input type="radio" name="setBg" value="plum" /><i class="sw3" style="--a:#2f2752;--b:#9a86f0;--c:#f5f4fa"></i><span>라벤더 플럼</span></label>
+          <label class="theme-opt"><input type="radio" name="setBg" value="ocean" /><i class="sw3" style="--a:#0b3a4a;--b:#2fb4c4;--c:#eef4f6"></i><span>딥 오션</span></label>
+          <label class="theme-opt"><input type="radio" name="setBg" value="charcoal" /><i class="sw3" style="--a:#1f2124;--b:#e2a43a;--c:#f3f3f1"></i><span>차콜 앰버</span></label>
+          <label class="theme-opt"><input type="radio" name="setBg" value="wine" /><i class="sw3" style="--a:#4a1a2b;--b:#d27a8f;--c:#f7f2f3"></i><span>와인 로즈</span></label>
+          <label class="theme-opt"><input type="radio" name="setBg" value="grey" /><i class="sw3" style="--a:#00462a;--b:#bcc924;--c:#eff1f4"></i><span>회색 + 연두</span></label>
+          <label class="theme-opt"><input type="radio" name="setBg" value="green" /><i class="sw3" style="--a:#00462a;--b:#bcc924;--c:#e1ece6"></i><span>초록 배경 + 연두</span></label>
+        </div>
       </div>
       <label class="inline"><input type="checkbox" id="setMock" /> 목업 데이터로 보기 (화면 테스트용)</label>
       <div class="dialog-actions">

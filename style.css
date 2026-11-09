@@ -934,3 +934,55 @@ html[data-bg="pro"] .sg-v.warn::before { background: #bcc924; }
   html[data-bg="pro"] .concl-hero { background: radial-gradient(120% 90% at 100% 0%, rgba(54,174,146,.28) 0%, rgba(54,174,146,0) 55%), #0a2f20; }
   html[data-bg="pro"] .btn.primary { background: #36ae92; border-color: #36ae92; color: #06251a; }
 }
+
+/* ===== 색 테마 (설정 → 색 테마) =====
+   테마마다 바탕·메뉴창·결론 카드·데이터 선 4가지만 정하고, 나머지는 공통 규칙으로 맞춘다.
+   등락은 어느 테마든 한국식(상승 붉은색·하락 푸른색). */
+html[data-bg="pro"]      { --t-bg:#f1f3f1; --t-side:#00462a; --t-hero:#00462a; --t-glow:54,174,146;  --t-line:#36ae92; --t-accent:#00462a; --t-accent2:#24907a; --t-soft:#e4f3ee; --t-foot:#8fe0c9; }
+html[data-bg="navy"]     { --t-bg:#f2f4f8; --t-side:#16223f; --t-hero:#16223f; --t-glow:109,140,255; --t-line:#5a7cf0; --t-accent:#1d2f5c; --t-accent2:#4a68d8; --t-soft:#e8edfb; --t-foot:#a9bcff; }
+html[data-bg="plum"]     { --t-bg:#f5f4fa; --t-side:#2f2752; --t-hero:#2f2752; --t-glow:154,134,240; --t-line:#8a74ea; --t-accent:#3a2f6a; --t-accent2:#7560d8; --t-soft:#eeebfb; --t-foot:#c9bcff; }
+html[data-bg="ocean"]    { --t-bg:#eef4f6; --t-side:#0b3a4a; --t-hero:#0b3a4a; --t-glow:47,180,196;  --t-line:#1fa2b3; --t-accent:#0b4557; --t-accent2:#17899a; --t-soft:#e1f2f5; --t-foot:#8fe3ec; }
+html[data-bg="charcoal"] { --t-bg:#f3f3f1; --t-side:#1f2124; --t-hero:#1f2124; --t-glow:226,164,58;  --t-line:#d4952a; --t-accent:#26282c; --t-accent2:#b27a17; --t-soft:#f6eedd; --t-foot:#f0c56f; }
+html[data-bg="wine"]     { --t-bg:#f7f2f3; --t-side:#4a1a2b; --t-hero:#4a1a2b; --t-glow:210,122,143; --t-line:#c25d77; --t-accent:#5a2236; --t-accent2:#b0506a; --t-soft:#f8e8ec; --t-foot:#f3b3c3; }
+
+html.themed { --bg: var(--t-bg); --accent: var(--t-accent); --accent-2: var(--t-accent2); --accent-soft: var(--t-soft); --card-line: #e6e8ea; --paper-2: #f7f8f9; --line-2: #eef0f1; background: var(--t-bg); }
+html.themed:not([data-bg="pro"]) { --up: #d9443a; --up-bg: #fdeae8; --down: #2f68d6; --down-bg: #e6eefc; --good: #1d8462; --good-bg: #e3f3ec; --bad: #c9443a; --bad-bg: #fcebe9; }
+html.themed body { background: var(--t-bg); }
+html.themed .side { background: var(--t-side); }
+html.themed .brand-mark { background: #fff; }
+html.themed .brand-mark polyline { stroke: var(--t-side); }
+html.themed .tab.active, html.themed .tab.active:hover { background: #fff; color: var(--t-side); }
+html.themed .tab.active::before { display: none; }
+html.themed .tab.active .ico { stroke: var(--t-side); }
+html.themed .side-foot { background: rgba(255,255,255,.07); }
+html.themed .side-foot b { color: var(--t-foot); }
+html.themed .btn.primary { background: var(--t-side); border-color: var(--t-side); color: #fff; }
+html.themed .concl-hero { background: radial-gradient(120% 90% at 100% 0%, rgba(var(--t-glow), .4) 0%, rgba(var(--t-glow), 0) 55%), var(--t-hero); }
+html.themed .ch-warn { background: rgba(255,255,255,.12); color: #fff; }
+html.themed .fc-cell { background: rgba(255,255,255,.08); }
+html.themed .fc-cell b.up { color: #ffaba1; }
+html.themed .fc-cell b.down { color: #a8c4ff; }
+html[data-bg="pro"] .fc-cell b.down { color: #9ed8ec; }
+html.themed .kpi-spark polyline, html.themed .spark polyline { stroke: var(--t-line); stroke-width: 1.5; }
+html.themed .kpi-spark polygon { fill: var(--t-line); opacity: .1; }
+html.themed .ph-kicker { color: var(--t-accent2) !important; }
+html.themed .ind-tag { background: var(--t-soft); border-color: transparent; color: var(--t-accent); }
+html.themed .co-mini-name { color: var(--t-accent); }
+
+/* 설정: 테마 고르기 */
+.theme-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; }
+.settings .theme-opt { flex-direction: row; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; font-weight: 600; color: var(--ink); }
+.settings .theme-opt:has(input:checked) { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.theme-opt input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.theme-opt:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sw3 { width: 30px; height: 22px; border-radius: 7px; flex: none; background: linear-gradient(90deg, var(--a) 0 45%, var(--b) 45% 72%, var(--c) 72%); box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+#settingsDialog { max-width: 520px; width: calc(100% - 32px); }
+
+@media (prefers-color-scheme: dark) {
+  html.themed { --bg: #0f1113; --accent: var(--t-line); --accent-2: var(--t-line); --accent-soft: rgba(var(--t-glow), .14); --card-line: #23272b; --paper-2: #1c2024; --line-2: #22262a; background: #0f1113; }
+  html.themed:not([data-bg="pro"]) { --up: #ff857a; --up-bg: #3a201d; --down: #82a8ff; --down-bg: #1a2640; --good: #6fd0a8; --good-bg: #15302a; --bad: #ff857a; --bad-bg: #3a201d; }
+  html.themed body { background: #0f1113; }
+  html.themed .btn.primary { background: var(--t-line); border-color: var(--t-line); color: #0b0e11; }
+  html.themed .ind-tag, html.themed .co-mini-name { color: var(--t-line); }
+  html.themed .tab.active, html.themed .tab.active:hover { color: var(--t-side); }
+}
