@@ -12,14 +12,17 @@ window.CONFIG = {
     dxy: { label: '달러인덱스', unit: '', digits: 2, desc: '주요 6개 통화 대비 달러 (유로 비중 절반 이상)' },
     usdkrw: { label: '원달러', unit: '원', digits: 1, desc: '오르면 원화 약세' },
     usdjpy: { label: '달러엔', unit: '엔', digits: 2, desc: '내리면 엔화 강세 (안전자산·엔캐리 청산)' },
+    jpykrw: { label: '원/100엔', unit: '원', digits: 2, desc: '원화가 달러에만 약한지, 엔화 대비로도 약한지' },
     usdcny: { label: '달러위안', unit: '위안', digits: 4, desc: '중국 경기·미중 관계. 원화와 같은 방향이 많음' },
-    dow: { label: '다우', unit: '', digits: 0, desc: '대형 가치·경기민감주' },
-    spx: { label: 'S&P500', unit: '', digits: 0, desc: '미국 시장 전체의 기준' },
-    ndx: { label: '나스닥', unit: '', digits: 0, desc: '기술·성장주, 금리에 민감' },
-    rut: { label: '러셀2000', unit: '', digits: 0, desc: '중소형주, 경기·인하 기대에 가장 민감' },
-    sox: { label: '필라델피아 반도체', unit: '', digits: 0, desc: '한국 반도체·KOSPI와 직결' },
+    dow: { label: '다우', unit: '', digits: 2, desc: '대형 가치·경기민감주' },
+    spx: { label: 'S&P500', unit: '', digits: 2, desc: '미국 시장 전체의 기준' },
+    ndx: { label: '나스닥', unit: '', digits: 2, desc: '기술·성장주, 금리에 민감' },
+    rut: { label: '러셀2000', unit: '', digits: 2, desc: '중소형주, 경기·인하 기대에 가장 민감' },
+    sox: { label: '필라델피아 반도체', unit: '', digits: 2, desc: '한국 반도체·KOSPI와 직결' },
     wti: { label: 'WTI 유가', unit: '$', digits: 2, desc: '물가와 경기 기대를 동시에 반영' },
-    gold: { label: '금', unit: '$', digits: 0, desc: '실질금리와 반대, 불안 심리에 상승' },
+    brent: { label: '브렌트유', unit: '$', digits: 2, desc: '국제 유가 기준. 중동·유럽 공급 이슈에 민감' },
+    wtibrent: { label: 'WTI − 브렌트', unit: '$', digits: 2, desc: '차이가 급변하면 미국 밖 공급 이슈 가능성' },
+    gold: { label: '금', unit: '$', digits: 2, desc: '실질금리와 반대, 불안 심리에 상승' },
     copper: { label: '구리', unit: '$/lb', digits: 3, desc: '경기를 보는 금속, 중국 경기에 민감' },
     cuau: { label: '구리/금 비율 (×1000)', unit: '', digits: 3, desc: '성장 기대 ÷ 불안 심리. 10년물과 같은 방향 경향' },
     vix: { label: 'VIX', unit: '', digits: 2, desc: '15↓ 안정 · 20↑ 변동성 확대 · 25↑ 위험 회피 심화' },
@@ -37,7 +40,7 @@ window.CONFIG = {
       id: 'rates', no: 1, title: '금리', lead: '가장 먼저 본다. 모든 자산 가격의 기준.',
       items: ['us2y', 'us10y', 't10y2y'],
       signals: ['curve'],
-      links: [{ label: '미국 재무부 수익률 곡선', url: 'https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve' }, { label: '네이버 미국 10년물 (실시간)', url: 'https://stock.naver.com/marketindex/bond/US10YT=RR/price' }, { label: 'CNBC Markets', url: 'https://www.cnbc.com/markets/' }],
+      links: [{ label: '미국 재무부 수익률 곡선', url: 'https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve' }, { label: '네이버 미국 10년물 (실시간)', url: 'https://stock.naver.com/marketindex/bond/US10YT=RR/price' }, { label: '네이버 시장지표 (글로벌 금리·기준금리)', url: 'https://stock.naver.com/market/marketindex' }, { label: 'CNBC Markets', url: 'https://www.cnbc.com/markets/' }],
       questions: ['10bp 이상 움직였나?', '2년물과 10년물 중 누가 더 움직였나? (커브 패턴)', '10년물 앞자리가 바뀌었나?'],
     },
     {
@@ -61,10 +64,10 @@ window.CONFIG = {
     },
     {
       id: 'commodity', no: 4, title: '유가', lead: '물가와 경기 기대. 3% 이상이면 원인 구분.',
-      items: ['wti'],
+      items: ['wti', 'brent', 'wtibrent'],
       signals: [],
-      links: [{ label: 'CNBC 원자재', url: 'https://www.cnbc.com/commodities/' }],
-      questions: ['수요 요인(주가·구리 동반)인가, 공급 요인(지정학·OPEC+)인가?'],
+      links: [{ label: '네이버 에너지', url: 'https://stock.naver.com/market/marketindex' }, { label: 'CNBC 원자재', url: 'https://www.cnbc.com/commodities/' }],
+      questions: ['수요 요인(주가·구리 동반)인가, 공급 요인(지정학·OPEC+)인가?', 'WTI−브렌트 차이가 벌어졌나? (벌어지면 미국 밖 공급 이슈)'],
     },
     {
       id: 'risk', no: 5, title: '위험·심리', lead: '시장이 얼마나 불안한가.',
@@ -101,7 +104,7 @@ window.CONFIG = {
       id: 'korea', no: 8, title: '한국 전이', lead: '미국 움직임이 한국으로 어떻게 넘어왔나.',
       items: ['kospi', 'kosdaq', 'kr3y', 'kr10y', 'krus10y'],
       signals: ['korea'],
-      links: [{ label: '네이버 증권', url: 'https://finance.naver.com/sise/' }, { label: '투자자별 매매동향', url: 'https://finance.naver.com/sise/sise_trans_style.naver' }, { label: '한국은행 ECOS', url: 'https://ecos.bok.or.kr/' }],
+      links: [{ label: '네이버 증권', url: 'https://finance.naver.com/sise/' }, { label: '네이버 시장지표 (한국 10년물 실시간)', url: 'https://stock.naver.com/market/marketindex' }, { label: '투자자별 매매동향', url: 'https://finance.naver.com/sise/sise_trans_style.naver' }, { label: '한국은행 ECOS', url: 'https://ecos.bok.or.kr/' }],
       questions: ['미국과 같은 방향인가? 다르면 왜?', '외국인 수급과 원달러가 같이 움직였나?', '국고채가 미국 금리를 따라갔나?'],
       manual: [
         { key: '외국인 순매수 KOSPI(억원)', type: 'number', placeholder: '예: -4200' },
@@ -124,7 +127,7 @@ window.CONFIG = {
   },
 
   // 주간 점검 (주 1~2회)
-  weeklyItems: ['hy', 'real10y', 'bei10y', 'gold', 'copper', 'cuau', 'usdjpy', 'usdcny'],
+  weeklyItems: ['hy', 'real10y', 'bei10y', 'gold', 'copper', 'cuau', 'usdjpy', 'jpykrw', 'usdcny'],
   weeklyQuestions: {
     hy: '벌어지는 추세인가? 주가와 반대로 가나?',
     real10y: '한 주 동안 10년물 변화를 실질금리가 주도했나?',
@@ -133,6 +136,7 @@ window.CONFIG = {
     copper: '중국·글로벌 경기 기대는?',
     cuau: '10년물 금리 방향과 일치하나?',
     usdjpy: '엔화 급강세(엔캐리 청산) 신호는?',
+    jpykrw: '원화가 엔화 대비로도 약해졌나? (달러 강세 때문만인지 원화 자체 약세인지)',
     usdcny: '위안화 약세가 원화에 부담을 줬나?',
   },
 };

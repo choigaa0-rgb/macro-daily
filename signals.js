@@ -151,6 +151,8 @@
     if (t10 && t10.ok && t10.prev != null && Math.floor(t10.value) !== Math.floor(t10.prev)) out.push(`10년물 앞자리 변화 (${t10.prev}% → ${t10.value}%): 반드시 기록`);
     const wti = c(items, 'wti');
     if (wti != null && Math.abs(wti) >= 3) out.push(`WTI ${fmt(wti)}%: 3% 이상, 수요 요인인지 공급 요인인지 구분`);
+    const wb = c(items, 'wtibrent');
+    if (wb != null && Math.abs(wb) >= 1) out.push(`WTI−브렌트 차이 ${fmt(wb)}달러 변화: 미국 밖(중동 등) 공급 이슈인지 확인`);
     const t = v(items, 't10y2y');
     if (t != null && t < 0) out.push(`장단기 금리차 역전 (${t}%p): 경기 둔화 신호 점검`);
     const jpy = c(items, 'usdjpy');
@@ -160,7 +162,7 @@
 
   // 날짜 맞추기: 미국 자산 신호는 금리(2년·10년)와 S&P500이 모두 있는 마지막 날짜 기준으로 계산
   // (출처마다 업데이트 시점이 달라, 금리는 11/05인데 주식은 11/06인 식으로 어긋나는 것을 막음)
-  const US_IDS = ['us2y', 'us10y', 't10y2y', 'real10y', 'bei10y', 'hy', 'dow', 'spx', 'ndx', 'rut', 'sox', 'dxy', 'usdjpy', 'usdcny', 'wti', 'gold', 'copper', 'vix'];
+  const US_IDS = ['us2y', 'us10y', 't10y2y', 'real10y', 'bei10y', 'hy', 'dow', 'spx', 'ndx', 'rut', 'sox', 'dxy', 'usdjpy', 'usdcny', 'wti', 'brent', 'wtibrent', 'gold', 'copper', 'vix'];
   const ANCHORS = ['us2y', 'us10y', 'spx'];
   const lastDate = (it) => (it && it.ok && it.pts && it.pts.length ? it.pts[it.pts.length - 1][0] : (it && it.ok ? it.date : null));
 
@@ -179,7 +181,11 @@
       const val = it.pts[idx][1];
       const prev = idx > 0 ? it.pts[idx - 1][1] : null;
       let chg = null;
-      if (prev != null) chg = it.chgUnit === 'bp' ? Math.round((val - prev) * 1000) / 10 : Math.round(((val - prev) / prev) * 10000) / 100;
+      if (prev != null) {
+        if (it.chgUnit === 'bp') chg = Math.round((val - prev) * 1000) / 10;
+        else if (it.chgUnit === '%') chg = Math.round(((val - prev) / prev) * 10000) / 100;
+        else chg = Math.round((val - prev) * 100) / 100;
+      }
       out[id] = Object.assign({}, it, { value: val, prev, chg, date: it.pts[idx][0] });
     });
     return { date, latest, mismatch: date !== latest, items: out };

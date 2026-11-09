@@ -10,7 +10,7 @@ const { sendJson, fetchWithTimeout } = require('./_lib');
 const YAHOO = {
   dow: '^DJI', spx: '^GSPC', ndx: '^IXIC', rut: '^RUT', sox: '^SOX',
   dxy: 'DX-Y.NYB', usdkrw: 'KRW=X', usdjpy: 'JPY=X', usdcny: 'CNY=X',
-  wti: 'CL=F', gold: 'GC=F', copper: 'HG=F', vix: '^VIX',
+  wti: 'CL=F', brent: 'BZ=F', gold: 'GC=F', copper: 'HG=F', vix: '^VIX',
   kospi: '^KS11', kosdaq: '^KQ11',
 };
 
@@ -25,6 +25,8 @@ const ECOS = { kr3y: '010200000', kr10y: '010210000' };
 
 // 금리처럼 %로 표시되는 값은 변화를 bp(0.01%p)로 계산
 const RATE_IDS = new Set([...Object.keys(FRED), ...Object.keys(ECOS)]);
+// 차이(스프레드)처럼 0 근처를 오가는 값은 변화를 % 대신 그대로의 차이로 계산
+const DIFF_IDS = { wtibrent: '$' };
 
 function round(x, d) {
   const m = Math.pow(10, d);
@@ -39,9 +41,11 @@ function summarize(id, points, source) {
   const prev = n >= 2 ? points[n - 2] : null;
   const week = n >= 6 ? points[n - 6] : points[0];
   const isRate = RATE_IDS.has(id);
+  const diffUnit = DIFF_IDS[id];
   const diff = (a, b) => {
     if (a == null || b == null) return null;
     if (isRate) return round((a - b) * 100, 1); // bp
+    if (diffUnit) return round(a - b, 2); // 그대로의 차이
     return round(((a - b) / b) * 100, 2); // %
   };
   return {
@@ -53,7 +57,7 @@ function summarize(id, points, source) {
     prevDate: prev ? prev.date : null,
     chg: prev ? diff(last.value, prev.value) : null,
     chg5: week && week !== last ? diff(last.value, week.value) : null,
-    chgUnit: isRate ? 'bp' : '%',
+    chgUnit: isRate ? 'bp' : diffUnit || '%',
     spark: points.slice(-20).map((p) => p.value),
     pts: points.slice(-30).map((p) => [p.date, p.value]), // 날짜 맞추기용
   };
@@ -104,11 +108,12 @@ async function getTreasury(type, columns) {
   return out;
 }
 
-// 두 시리즈를 같은 날짜끼리 빼서 새 시리즈 만들기 (a − b)
-function subtract(a, b, digits = 2) {
+// 두 시리즈를 같은 날짜끼리 계산해 새 시리즈 만들기
+function combine(a, b, fn, digits = 2) {
   const map = new Map(b.map((p) => [p.date, p.value]));
-  return a.filter((p) => map.has(p.date)).map((p) => ({ date: p.date, value: round(p.value - map.get(p.date), digits) }));
+  return a.filter((p) => map.has(p.date) && map.get(p.date)).map((p) => ({ date: p.date, value: round(fn(p.value, map.get(p.date)), digits) }));
 }
+const subtract = (a, b, digits = 2) => combine(a, b, (x, y) => x - y, digits);
 
 // ---------- Yahoo / FRED / ECOS ----------
 async function getYahoo(symbol) {
@@ -164,6 +169,7 @@ module.exports = async (req, res) => {
   }
 
   const items = {};
+  const raw = {}; // Yahoo 원본 시리즈 (계산 지표용)
   const errors = [];
   const tasks = [];
   const fredNeeded = new Set(['hy']);
@@ -173,7 +179,7 @@ module.exports = async (req, res) => {
   for (const [id, sym] of Object.entries(YAHOO)) {
     tasks.push(
       getYahoo(sym)
-        .then((pts) => { items[id] = summarize(id, pts, 'Yahoo Finance'); })
+        .then((pts) => { raw[id] = pts; items[id] = summarize(id, pts, 'Yahoo Finance'); })
         .catch((e) => { items[id] = { ok: false, source: 'Yahoo Finance', error: e.message }; errors.push(`${id}: ${e.message}`); })
     );
   }
@@ -238,6 +244,11 @@ module.exports = async (req, res) => {
       value: round((items.kr10y.value - items.us10y.value) * 100, 0), chg: null, chgUnit: 'bp',
     };
   }
+  // WTI − 브렌트 차이 ($)
+  if (raw.wti && raw.brent) items.wtibrent = summarize('wtibrent', subtract(raw.wti, raw.brent), '계산 (Yahoo)');
+  // 원/100엔 = 원달러 ÷ 달러엔 × 100
+  if (raw.usdkrw && raw.usdjpy) items.jpykrw = summarize('jpykrw', combine(raw.usdkrw, raw.usdjpy, (k, j) => (k / j) * 100), '계산 (Yahoo)');
+
   // 구리/금 비율 (구리 $/lb ÷ 금 $/oz × 1000)
   if (items.copper && items.copper.ok && items.gold && items.gold.ok) {
     const now = (items.copper.value / items.gold.value) * 1000;

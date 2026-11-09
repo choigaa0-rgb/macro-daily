@@ -20,13 +20,13 @@ function item(value, steps, unit, source, end) {
   let v = value;
   for (let i = 0; i < 24; i++) {
     const s = steps[i % steps.length];
-    v = isRate ? v - s / 100 : v / (1 + s / 100);
+    v = isRate ? v - s / 100 : unit === '$' ? v - s : v / (1 + s / 100);
     vals.unshift(Number(v.toFixed(4)));
   }
   const dates = businessDates(end, vals.length);
   const pts = dates.map((d, i) => [d, vals[i]]);
   const n = vals.length;
-  const diff = (a, b) => (isRate ? Math.round((a - b) * 1000) / 10 : Math.round(((a - b) / b) * 10000) / 100);
+  const diff = (a, b) => (isRate ? Math.round((a - b) * 1000) / 10 : unit === '$' ? Math.round((a - b) * 100) / 100 : Math.round(((a - b) / b) * 10000) / 100);
   return {
     ok: true, source, date: dates[n - 1], value, prev: vals[n - 2], prevDate: dates[n - 2],
     chg: diff(vals[n - 1], vals[n - 2]), chg5: diff(vals[n - 1], vals[n - 6]), chgUnit: unit,
@@ -60,6 +60,9 @@ module.exports = {
     usdjpy: item(152.8, [-0.2, 0.35, 0.3, -0.1, 0.2, 0.1], '%', Y, S),
     usdcny: item(7.18, [0.05, 0.12, 0.03, -0.02, 0.04, 0.01], '%', Y, S),
     wti: item(68.9, [1.2, -0.8, 0.9, 0.4, -0.5, 0.3], '%', Y, S),
+    brent: item(75.6, [0.9, -0.6, 0.7, 0.3, -0.4, 0.2], '%', Y, S),
+    wtibrent: item(-6.7, [0.12, -0.08, 0.05, 0.02, -0.1, 0.04], '$', '계산 (목업)', S),
+    jpykrw: item(928.4, [0.92, -0.05, -0.5, 0.2, 0.2, -0.3], '%', '계산 (목업)', S),
     gold: item(3980.2, [-0.6, 0.3, -0.2, 0.1, -0.4, 0.2], '%', Y, S),
     copper: item(4.92, [0.8, -0.8, -0.5, 0.2, -0.6, 0.1], '%', Y, S),
     vix: item(17.4, [-6.2, 9.6, -3.1, 2.2, 4.4, -2.0], '%', Y, S),

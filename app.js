@@ -100,7 +100,7 @@
     const span = max - min || 1;
     const pts = arr.map((v, i) => `${((i / (arr.length - 1)) * w).toFixed(1)},${(h - 2 - ((v - min) / span) * (h - 4)).toFixed(1)}`).join(' ');
     const up = arr[arr.length - 1] >= arr[0];
-    return `<svg class="spark ${up ? 'up' : 'down'}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts}" /></svg>`;
+    return `<svg class="spark ${up ? 'up' : 'down'}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" /></svg>`;
   }
 
   function tile(id, mode) {
@@ -114,12 +114,13 @@
     const isWeekly = mode === 'weekly';
     const chg = isWeekly ? it.chg5 : it.chg;
     const d = it.chgUnit === 'bp' ? 1 : 2;
+    const suf = it.chgUnit === 'bp' ? 'bp' : it.chgUnit === '%' ? '%' : it.chgUnit;
     const dir = chg == null ? '' : chg > 0 ? 'up' : chg < 0 ? 'down' : '';
     const unit = def.unit && def.unit !== '%' ? ` <small>${esc(def.unit)}</small>` : def.unit === '%' ? '<small>%</small>' : '';
     return `<div class="tile" title="${esc(def.desc)}">
       <div class="t-label">${esc(def.label)}</div>
       <div class="t-row"><div class="t-value">${num(it.value, def.digits)}${unit}</div>${sparkline(it.spark)}</div>
-      <div class="t-chg ${dir}">${signed(chg, d, it.chgUnit === 'bp' ? 'bp' : '%')} <span class="t-period">${isWeekly ? '5일' : '전일 대비'}</span></div>
+      <div class="t-chg ${dir}">${signed(chg, d, suf)} <span class="t-period">${isWeekly ? '5일' : '전일 대비'}</span></div>
       <div class="t-sub">${esc(def.desc)}</div>
       <div class="t-src">${esc(it.source)} · ${esc(it.date || '')}</div>
     </div>`;
@@ -335,6 +336,14 @@
             <div id="weekDailyList"><span class="muted">기록 탭에서 시트를 연결하면 이번 주 결론들이 여기에 모입니다.</span></div>
           </div>
           <div class="card">
+            <h2>글로벌 10년물</h2>
+            <p class="hint">미국만 움직였는지, 글로벌 금리가 같이 움직였는지 비교합니다. <a href="https://stock.naver.com/market/marketindex" target="_blank" rel="noopener">네이버 시장지표 ↗</a>에서 확인해 입력하세요.</p>
+            <div class="fields global10">
+              ${['독일', '일본', '중국', '한국'].map((c) => `<label class="fld"><span>${c} 10년(%)</span><input type="number" step="any" data-key="${c} 10년(%)" /><em class="vs-us" data-vs="${c} 10년(%)"></em></label>`).join('')}
+            </div>
+            <label class="fld wide"><span>글로벌 금리 메모</span><input type="text" data-key="글로벌 금리 메모" placeholder="예: 미국만 상승, 독일·일본은 보합 → 미국 고유 요인(물가·재정)" /></label>
+          </div>
+          <div class="card">
             <h2>기사 스크랩</h2>
             <p class="hint">4건 고정보다, 이번 주 핵심 동인과 관련된 1~3건.</p>
             ${scraps}
@@ -357,6 +366,16 @@
         </aside>
       </div>`;
     restore($('#view-weekly'), store.get(weekKey(), {}));
+    updateVsUs();
+  }
+  // 글로벌 10년물 입력값을 미국 10년물과 비교 (bp)
+  function updateVsUs() {
+    const us = state.market && state.market.items.us10y && state.market.items.us10y.ok ? state.market.items.us10y.value : null;
+    $$('[data-vs]').forEach((el) => {
+      const inp = $(`[data-key="${el.dataset.vs}"]`);
+      const x = inp ? parseFloat(inp.value) : NaN;
+      el.textContent = us != null && !isNaN(x) ? `미국 대비 ${signed(Math.round((x - us) * 100), 0, 'bp')}` : '';
+    });
   }
 
   // ---------- 기록 ----------
@@ -442,7 +461,7 @@
     if (!state.market) return '';
     return Object.entries(state.market.items).filter(([, it]) => it && it.ok).map(([id, it]) => {
       const def = C.indicators[id] || { label: id, digits: 2 };
-      const u = it.chgUnit === 'bp' ? 'bp' : '%';
+      const u = it.chgUnit || '%';
       return `${def.label}: ${num(it.value, def.digits)} (전일 ${signed(it.chg, 2, u)}, 5일 ${signed(it.chg5, 2, u)}, ${it.date})`;
     }).join('\n');
   }
@@ -510,7 +529,7 @@
         const def = C.indicators[id];
         if (!def) return;
         rec[`${def.label}`] = it && it.ok ? it.value : '';
-        rec[`${def.label} 변화(${it && it.chgUnit === 'bp' ? 'bp' : '%'})`] = it && it.ok && it.chg != null ? it.chg : '';
+        rec[`${def.label} 변화(${(it && it.chgUnit) || '%'})`] = it && it.ok && it.chg != null ? it.chg : '';
       });
       rec['데이터 기준'] = state.market.mock ? '목업' : '자동수집';
     }
@@ -562,10 +581,15 @@
         const it = state.market.items[id];
         const def = C.indicators[id];
         rec[def.label] = it && it.ok ? it.value : '';
-        rec[`${def.label} 5일 변화(${it && it.chgUnit === 'bp' ? 'bp' : '%'})`] = it && it.ok && it.chg5 != null ? it.chg5 : '';
+        rec[`${def.label} 5일 변화(${(it && it.chgUnit) || '%'})`] = it && it.ok && it.chg5 != null ? it.chg5 : '';
       });
     }
     Object.assign(rec, w);
+    const us10 = state.market && state.market.items.us10y && state.market.items.us10y.ok ? state.market.items.us10y.value : null;
+    ['독일', '일본', '중국', '한국'].forEach((c) => {
+      const x = parseFloat(w[`${c} 10년(%)`]);
+      rec[`${c}−미국 10년(bp)`] = us10 != null && !isNaN(x) ? Math.round((x - us10) * 100) : '';
+    });
     try {
       await api('/api/save', { method: 'POST', body: JSON.stringify({ sheet: '주간', record: rec }) });
       toast('주간 기록을 저장했습니다', 'ok');
@@ -607,6 +631,7 @@
     document.addEventListener('input', (e) => {
       if (e.target.closest('[data-key]') || e.target.matches('[data-key]')) {
         if (e.target.dataset.key && e.target.dataset.key.startsWith('발표지표')) updateSurprises();
+        if (e.target.dataset.key && e.target.dataset.key.endsWith('10년(%)')) updateVsUs();
         saveDraft();
       }
     });
