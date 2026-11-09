@@ -992,9 +992,9 @@ html.themed .co-mini-name { color: var(--t-accent); }
 .sec-bar-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .sec-bar-head h3 { margin: 0; font-size: 15px; }
 .sec-bar-head .btn.mini { margin-left: auto; font-size: 12px; padding: 5px 11px; }
-.seg { display: inline-flex; background: var(--paper-2); border: 1px solid var(--card-line, var(--line)); border-radius: 999px; padding: 2px; }
-.seg button { font: inherit; font-size: 12.5px; font-weight: 650; border: 0; background: transparent; color: var(--ink-3); padding: 4px 12px; border-radius: 999px; cursor: pointer; }
-.seg button.on { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.pillseg { display: inline-flex; background: var(--paper-2); border: 1px solid var(--card-line, var(--line)); border-radius: 999px; padding: 2px; }
+.pillseg button { font: inherit; font-size: 12.5px; font-weight: 650; border: 0; background: transparent; color: var(--ink-3); padding: 4px 12px; border-radius: 999px; cursor: pointer; }
+.pillseg button.on { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
 .sec-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .sec-panel { border: 1px solid var(--card-line, var(--line)); border-radius: 16px; padding: 14px 16px 12px; min-width: 0; }
 .sp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
@@ -1014,3 +1014,15 @@ html.themed .co-mini-name { color: var(--t-accent); }
 .err.small, p.small { font-size: 12.5px; }
 @media (max-width: 1100px) { .sec-panels { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .sbar li { grid-template-columns: 78px minmax(0, 1fr) 54px; } }
+
+/* 산업 이슈 태그·필터 */
+#industryPanel > .ind-filter { grid-column: 1 / -1; justify-self: start; }
+.ind-filter button .muted { font-weight: 500; margin-left: 2px; }
+.issue-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rg-tag { font-size: 11.5px; font-weight: 700; padding: 3px 8px; border-radius: 8px; background: var(--ink); color: var(--paper); }
+.mv-tag { font-size: 11.5px; font-weight: 650; padding: 3px 8px; border-radius: 8px; background: var(--neutral-bg); color: var(--neutral); white-space: nowrap; }
+.mv-tag.up { background: var(--up-bg); color: var(--up); }
+.mv-tag.down { background: var(--down-bg); color: var(--down); }
+.issue .issue-t { margin-top: 10px; }
+#industryPanel > .ind-filter { align-self: start; width: max-content; }
+.ind-filter button { white-space: nowrap; padding: 6px 14px; }

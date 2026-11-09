@@ -5,23 +5,49 @@
 
 const { sendJson, isAuthorized, callGemini, sheetPost, sheetRows, parseJsonLoose, kstDate } = require('./_lib');
 const { fetchNews } = require('./_data');
+const { krSectors } = require('./sectors');
+
+// 태그 기준 (날마다 들쭉날쭉하지 않게 정해진 목록에서만 고름)
+// 섹터: Finviz·GICS 11개 섹터 (매일 점검 '미국 섹터' 그래프와 같은 이름)
+const SECTORS = ['기술', '커뮤니케이션', '경기소비재', '필수소비재', '헬스케어', '금융', '산업재', '소재', '에너지', '유틸리티', '부동산'];
+const REGIONS = ['국내', '해외', '공통'];
+// 코스피 업종: KRX에서 실제 이름을 받으면 그것, 못 받으면 아래 기본 목록
+const KOSPI_DEFAULT = ['음식료·담배', '섬유·의류', '종이·목재', '화학', '제약', '비금속', '금속', '기계·장비', '전기·전자', '의료·정밀기기', '운송장비·부품', '유통', '전기·가스', '건설', '운송·창고', '통신', '금융', '증권', '보험', '일반서비스', 'IT 서비스', '부동산', '오락·문화'];
+const SECTOR_ALIAS = { IT: '기술', 정보기술: '기술', 테크: '기술', 반도체: '기술', 통신: '커뮤니케이션', 통신서비스: '커뮤니케이션', 미디어: '커뮤니케이션', 소비재: '경기소비재', 임의소비재: '경기소비재', 자동차: '경기소비재', 바이오: '헬스케어', 제약: '헬스케어', 헬스: '헬스케어', 은행: '금융', 증권: '금융', 보험: '금융', 산업: '산업재', 조선: '산업재', 방산: '산업재', 화학: '소재', 철강: '소재', 정유: '에너지', 전력: '유틸리티', 건설: '산업재' };
+const norm = (x) => String(x || '').replace(/[\s·.,]/g, '').replace(/업$/, '');
 
 const PROMPT = `너는 한국 증권사 리서치센터의 산업 애널리스트 팀장이다.
 주어진 오늘 경제·산업 뉴스 목록(번호, 출처, 제목, 짧은 요약)만 보고 '전 산업'에서 투자 관점에서 중요한 이슈 6~8개를 고른다.
 원칙:
 1. 목록에 있는 기사만 근거로 쓴다. 기사에 없는 사실·숫자·발언을 지어내지 않는다. 각 이슈는 근거 기사 번호를 1개 이상 단다.
 2. 같은 사건을 다룬 여러 기사는 하나의 이슈로 묶는다. 정치·사건사고처럼 산업과 무관한 기사는 뺀다.
-3. 산업 이름은 짧게(예: 반도체, 2차전지, 자동차, 조선, 방산, 바이오, 인터넷·플랫폼, 게임, 은행, 증권, 보험, 에너지·정유, 화학, 철강, 건설, 유통·소비재, 항공·해운, 통신, 유틸리티).
+3. 태그는 세 가지를 정한다.
+   - sector: 반드시 다음 11개 중 하나 → {SECTORS}
+   - industry: 세부 산업을 짧게 (예: 반도체, 2차전지, 자동차, 조선, 방산, 바이오, 인터넷·플랫폼, 게임, 은행, 증권, 보험, 정유, 화학, 철강, 건설, 유통, 항공·해운, 통신, 전력)
+   - region: 국내(한국 기업·한국 시장 이야기) | 해외(외국 기업·외국 시장 이야기) | 공통(해외 사건이 한국 기업에 바로 영향, 예: 엔비디아 실적 → 국내 반도체)
+   - kospi_sector: region이 국내·공통이면 다음 코스피 업종 중 가장 가까운 하나, 해외면 빈 문자열 → {KOSPI}
 4. 관련 기업은 근거 기사에 이름이 나온 상장사만 적는다.
 5. 매크로 연결은 주어진 '오늘의 매크로' 내용과 이어서 한 문장으로. 매크로 정보가 없으면 빈 문자열.
 6. 투자 권유·매수 추천은 하지 않는다. 한국어, 짧은 문장. JSON 하나만 출력한다.
 출력:
 { "headline": "오늘 산업 이슈 한 줄 요약",
-  "issues": [ { "industry": "산업", "title": "이슈 제목", "summary": "무슨 일인지 2문장", "why": "왜 중요한지 한 문장",
+  "issues": [ { "sector": "기술", "industry": "반도체", "region": "공통", "kospi_sector": "전기·전자", "title": "이슈 제목", "summary": "무슨 일인지 2문장", "why": "왜 중요한지 한 문장",
     "impact": "긍정 | 부정 | 혼재 | 중립", "macro_link": "", "companies": ["기업명"], "sources": [1, 2] } ] }`;
 
-function verifyIssues(issues, news) {
-  return (issues || []).map((it) => {
+// 태그를 정해진 목록에 맞춤 (목록 밖이면 비슷한 말로 바꾸고, 그래도 없으면 비움)
+function fixTags(it, kospiList) {
+  let sector = String(it.sector || '').trim();
+  if (!SECTORS.includes(sector)) sector = SECTOR_ALIAS[sector] || SECTOR_ALIAS[String(it.industry || '').trim()] || SECTORS.find((x) => sector.includes(x)) || '';
+  const region = REGIONS.includes(it.region) ? it.region : '국내';
+  let ks = String(it.kospi_sector || '').trim();
+  if (region === '해외') ks = '';
+  else if (ks && !kospiList.includes(ks)) ks = kospiList.find((x) => norm(x) === norm(ks)) || kospiList.find((x) => norm(x).includes(norm(ks)) || norm(ks).includes(norm(x))) || '';
+  return { sector, region, kospi_sector: ks, industry: String(it.industry || sector || '').trim() };
+}
+
+function verifyIssues(issues, news, kospiList = KOSPI_DEFAULT) {
+  return (issues || []).map((raw) => {
+    const it = Object.assign({}, raw, fixTags(raw, kospiList));
     const srcs = (it.sources || []).map((n) => news[Number(n) - 1]).filter(Boolean);
     const text = srcs.map((s) => `${s.title} ${s.desc || ''}`).join(' ');
     const companies = (it.companies || []).map((c) => ({ name: c, inSource: !!c && text.includes(String(c).replace(/\s/g, '').slice(0, 4)) }));
@@ -38,7 +64,7 @@ function mailSection(data) {
   const color = { 긍정: '#1e7a52', 부정: '#b23a30', 혼재: '#a2620b', 중립: '#5f6875' };
   return `<h3 style="margin:20px 0 6px">산업 이슈${data.headline ? ` · ${esc(data.headline)}` : ''}</h3>
     ${(data.issues || []).map((it) => `<div style="margin:0 0 10px;padding:8px 10px;border-left:3px solid ${color[it.impact] || '#5f6875'};background:#fafafa">
-      <b>[${esc(it.industry)}] ${esc(it.title)}</b> <span style="color:${color[it.impact] || '#5f6875'};font-size:12px">${esc(it.impact || '')}</span>
+      <b>[${esc([it.region, it.sector, it.industry].filter((x, i, a) => x && a.indexOf(x) === i).join(' · '))}] ${esc(it.title)}</b> <span style="color:${color[it.impact] || '#5f6875'};font-size:12px">${esc(it.impact || '')}</span>
       <div style="font-size:13px;margin-top:3px">${esc(it.summary)}${it.macro_link ? `<br><span style="color:#24609b">매크로: ${esc(it.macro_link)}</span>` : ''}</div>
       <div style="font-size:12px;margin-top:3px">${it.links.map((l) => `<a href="${esc(l.link)}">${esc(l.source)}</a>`).join(' · ')}</div></div>`).join('')}`;
 }
@@ -46,21 +72,24 @@ function mailSection(data) {
 async function build() {
   const started = Date.now();
   const date = kstDate();
-  const [news, auto] = await Promise.all([fetchNews({ hours: 30, max: 120 }), sheetRows('자동 브리핑', 5)]);
+  const krNames = Promise.race([krSectors().then((k) => (k.ok ? k.rows.map((r) => r.name) : null)).catch(() => null), new Promise((r) => setTimeout(() => r(null), 6000))]);
+  const [news, auto, krList] = await Promise.all([fetchNews({ hours: 30, max: 120 }), sheetRows('자동 브리핑', 5), krNames]);
+  const kospiList = krList && krList.length ? krList : KOSPI_DEFAULT;
   if (!news.items.length) throw new Error(`뉴스를 가져오지 못했습니다 (${news.errors.join(' / ')})`);
   const today = auto.find((r) => r['날짜'] === date) || auto[0];
   const macro = today ? [today['한 줄 요약'], today['자동_섹터 시사점']].filter(Boolean).join('\n') : '';
   const list = news.items.map((n, i) => `${i + 1}. [${n.source}] ${n.title}${n.desc ? ` — ${n.desc.slice(0, 90)}` : ''}`).join('\n');
   const budget = 52000 - (Date.now() - started);
-  const r = await callGemini({ system: PROMPT, parts: [{ text: `날짜: ${date}\n\n[오늘의 매크로]\n${macro || '(없음)'}\n\n[뉴스 목록]\n${list}` }], temperature: 0.3, json: true, maxOutputTokens: 3000, budgetMs: budget, primaryMs: Math.min(28000, budget - 10000) });
+  const system = PROMPT.replace('{SECTORS}', SECTORS.join(', ')).replace('{KOSPI}', kospiList.join(', '));
+  const r = await callGemini({ system, parts: [{ text: `날짜: ${date}\n\n[오늘의 매크로]\n${macro || '(없음)'}\n\n[뉴스 목록]\n${list}` }], temperature: 0.3, json: true, maxOutputTokens: 3000, budgetMs: budget, primaryMs: Math.min(28000, budget - 10000) });
   if (!r.ok) throw new Error(r.error);
   const j = parseJsonLoose(r.text);
   if (!j || !Array.isArray(j.issues)) throw new Error('AI 응답 형식을 읽지 못했습니다');
-  const issues = verifyIssues(j.issues, news.items);
+  const issues = verifyIssues(j.issues, news.items, kospiList);
   const data = { date, headline: j.headline || '', issues, model: r.model, newsCount: news.items.length, feedErrors: news.errors, macroUsed: !!macro };
   await sheetPost({ sheet: '산업 이슈', record: {
     '날짜': date, '생성시각': new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false }), '한 줄 요약': data.headline,
-    '이슈 수': issues.length, '산업': issues.map((x) => x.industry).join(', '), '관련 기업': [...new Set(issues.flatMap((x) => x.companies.map((c) => c.name)))].join(', '),
+    '이슈 수': issues.length, '산업': issues.map((x) => [x.region, x.sector, x.industry].filter(Boolean).join('·')).join(', '), '관련 기업': [...new Set(issues.flatMap((x) => x.companies.map((c) => c.name)))].join(', '),
     '모델': r.model, '이슈 JSON': JSON.stringify(data),
   } }).catch((e) => { data.saveError = e.message; });
   return data;
@@ -79,4 +108,6 @@ module.exports = async (req, res) => {
   }
 };
 module.exports.verifyIssues = verifyIssues;
+module.exports.fixTags = fixTags;
+module.exports.SECTORS = SECTORS;
 module.exports.mailSection = mailSection;

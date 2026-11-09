@@ -173,7 +173,7 @@
     state.sectorBusy = true; renderSectors();
     try { state.sectors = await api('/api/sectors' + (settings().mock ? '?mock=1' : '')); }
     catch (e) { state.sectors = { us: { ok: false, error: e.message, rows: [] }, kr: { ok: false, error: e.message, rows: [] } }; }
-    state.sectorBusy = false; renderSectors();
+    state.sectorBusy = false; renderSectors(); renderIndustry();
   }
   function sectorBars(rows, key, label) {
     const list = rows.filter((r) => r[key] != null).slice().sort((a, b) => b[key] - a[key]);
@@ -207,7 +207,7 @@
     if (!box) return;
     const key = state.secPeriod || 'd1';
     box.innerHTML = `<div class="sec-bar-head"><h3>섹터 등락</h3>
-      <div class="seg" role="group" aria-label="기간"><button type="button" class="${key === 'd1' ? 'on' : ''}" data-act="sec-period" data-val="d1">1일</button><button type="button" class="${key === 'w1' ? 'on' : ''}" data-act="sec-period" data-val="w1">1주</button></div>
+      <div class="pillseg" role="group" aria-label="기간"><button type="button" class="${key === 'd1' ? 'on' : ''}" data-act="sec-period" data-val="d1">1일</button><button type="button" class="${key === 'w1' ? 'on' : ''}" data-act="sec-period" data-val="w1">1주</button></div>
       <button class="btn mini" type="button" data-act="sec-fill" ${state.sectors ? '' : 'disabled'}>상위·하위 섹터를 아래 칸에 넣기</button></div>
       <div class="sec-panels">${sectorPanel('us')}${sectorPanel('kr')}</div>`;
   }
@@ -972,7 +972,7 @@
 
         ${state.industry ? `<section class="card span-6"><div class="wk-head"><h2>산업 이슈</h2><a href="#" data-act="goto-industry">전체 보기</a></div>
           ${state.industry.headline ? `<p class="muted small">${esc(state.industry.headline)}</p>` : ''}
-          <ul class="mini-list">${state.industry.issues.slice(0, 4).map((it) => `<li><span class="ind-tag">${esc(it.industry)}</span><span class="ml-t">${esc(it.title)}</span><span class="badge ${IMPACT_TONE[it.impact] || 'neutral'}">${esc(it.impact || '')}</span></li>`).join('')}</ul></section>` : ''}
+          <ul class="mini-list">${state.industry.issues.slice(0, 4).map((it) => `<li><span class="ind-tag">${esc(it.industry || it.sector || '')}</span><span class="ml-t">${esc(it.title)}</span><span class="badge ${IMPACT_TONE[it.impact] || 'neutral'}">${esc(it.impact || '')}</span></li>`).join('')}</ul></section>` : ''}
         ${state.company ? `<section class="card co-mini ${state.industry ? 'span-6' : 'span-12'}"><div class="wk-head"><h2>오늘의 기업</h2><a href="#" data-act="goto-company">카드 보기</a></div>
           <div class="co-mini-name">${esc(state.company.data.company.name)}</div>
           <p>${esc((state.company.card || {}).one_liner || '')}</p><p class="muted small">${esc(state.company.reason || '')}</p></section>` : ''}
@@ -1035,6 +1035,27 @@
     } catch (e) { toast(e.message, 'err'); state.industryMsg = e.message; }
     state.industryBusy = false; renderIndustry(); renderBrief();
   }
+  // 지역 필터: '국내'에는 공통도, '해외'에도 공통을 함께 보여줌
+  function inRegion(it, r) {
+    if (r === '전체' || !it.region) return true;
+    return it.region === r || it.region === '공통';
+  }
+  // 이슈 섹터의 그날 등락 (미국 섹터 ETF / 코스피 업종) — 뉴스와 가격이 같은 방향인지 보는 용도
+  function sectorMove(it) {
+    const S0 = state.sectors;
+    if (!S0) return '';
+    const nm = (x) => String(x || '').replace(/[\s·.,]/g, '').replace(/업$/, '');
+    const out = [];
+    if (it.region !== '국내' && it.sector && S0.us && S0.us.ok) {
+      const r = S0.us.rows.find((x) => x.ko === it.sector);
+      if (r && r.d1 != null) out.push(['미국 ' + r.ko, r.d1]);
+    }
+    if (it.region !== '해외' && it.kospi_sector && S0.kr && S0.kr.ok) {
+      const r = S0.kr.rows.find((x) => nm(x.name) === nm(it.kospi_sector));
+      if (r && r.d1 != null) out.push(['코스피 ' + r.name, r.d1]);
+    }
+    return out.map(([l, v]) => `<span class="mv-tag ${v > 0 ? 'up' : v < 0 ? 'down' : ''}" title="그날 섹터 등락">${esc(l)} ${signed(v, 2, '%')}</span>`).join('');
+  }
   function renderIndustry() {
     const box = $('#industryPanel');
     if (!box) return;
@@ -1049,9 +1070,11 @@
         ${I && I.headline ? `<p class="headline">${esc(I.headline)}</p>` : ''}
         <p class="hint">연합뉴스·매일경제·비즈니스포스트 RSS(제목·짧은 요약)에서 AI가 전 산업 이슈를 골라 정리합니다. 근거 기사가 없는 이슈는 자동으로 뺍니다. 원문은 링크로 확인하세요.</p>
       </div>
-      ${I ? I.issues.map((it) => `<div class="card issue">
-        <div class="wk-head"><div><span class="ind-tag">${esc(it.industry)}</span> <b class="issue-t">${esc(it.title)}</b></div>
+      ${I ? `<div class="ind-filter pillseg" role="group" aria-label="지역">${['전체', '국내', '해외'].map((r) => `<button type="button" class="${(state.indRegion || '전체') === r ? 'on' : ''}" data-act="ind-region" data-val="${r}">${r} <span class="muted">${r === '전체' ? I.issues.length : I.issues.filter((x) => inRegion(x, r)).length}</span></button>`).join('')}</div>` : ''}
+      ${I ? I.issues.filter((it) => inRegion(it, state.indRegion || '전체')).map((it) => `<div class="card issue">
+        <div class="wk-head"><div class="issue-tags">${it.region ? `<span class="rg-tag">${esc(it.region)}</span>` : ''}<span class="ind-tag">${esc([it.sector, it.industry].filter((x, i, a) => x && a.indexOf(x) === i).join(' · ') || it.industry || '')}</span>${sectorMove(it)}</div>
           <span class="badge ${IMPACT_TONE[it.impact] || 'neutral'}">${esc(it.impact || '')}</span></div>
+        <b class="issue-t">${esc(it.title)}</b>
         <p>${esc(it.summary)}</p>
         ${it.why ? `<p class="muted"><b>왜 중요한가</b> ${esc(it.why)}</p>` : ''}
         ${it.macro_link ? `<p class="macro-l"><b>매크로 연결</b> ${esc(it.macro_link)}</p>` : ''}
@@ -1740,6 +1763,7 @@
         const a = act.dataset.act;
         if (a === 'goto-conclusion') { gotoTab('daily'); setTimeout(() => $('#conclusionPanel').scrollIntoView({ behavior: 'smooth' }), 50); return; }
         if (a === 'goto-center') { e.preventDefault(); gotoTab('center'); return; }
+        if (a === 'ind-region') { state.indRegion = act.dataset.val; renderIndustry(); return; }
         if (a === 'sec-period') { state.secPeriod = act.dataset.val; renderSectors(); return; }
         if (a === 'sec-fill') { sectorFill(); return; }
         if (a === 'ai-chief') { runChief(); return; }
