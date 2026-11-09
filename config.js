@@ -37,7 +37,7 @@ window.CONFIG = {
       id: 'rates', no: 1, title: '금리', lead: '가장 먼저 본다. 모든 자산 가격의 기준.',
       items: ['us2y', 'us10y', 't10y2y'],
       signals: ['curve'],
-      links: [{ label: 'CNBC Markets', url: 'https://www.cnbc.com/markets/' }, { label: 'FRED 2s10s', url: 'https://fred.stlouisfed.org/series/T10Y2Y' }],
+      links: [{ label: '미국 재무부 수익률 곡선', url: 'https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve' }, { label: '네이버 미국 10년물 (실시간)', url: 'https://stock.naver.com/marketindex/bond/US10YT=RR/price' }, { label: 'CNBC Markets', url: 'https://www.cnbc.com/markets/' }],
       questions: ['10bp 이상 움직였나?', '2년물과 10년물 중 누가 더 움직였나? (커브 패턴)', '10년물 앞자리가 바뀌었나?'],
     },
     {

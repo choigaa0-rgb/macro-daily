@@ -197,7 +197,8 @@
     }).join('');
     $('#overview').innerHTML = `
       <div class="ov-left">
-        <div class="ov-label">오늘의 자동 신호</div>
+        <div class="ov-label">오늘의 자동 신호${sig.signalDate ? ` <span class="sig-date">미국 ${esc(sig.signalDate)} 종가 기준</span>` : ''}</div>
+        ${sig.dateMismatch ? `<div class="sig-warn">금리와 주식의 최신 날짜가 달라 신호는 둘 다 있는 ${esc(sig.signalDate)} 기준으로 계산했습니다. 카드에는 각 지표의 최신 값이 표시됩니다.</div>` : ''}
         <div class="chips">${chips || '<span class="muted">데이터를 불러오면 표시됩니다</span>'}</div>
         ${flags ? `<ul class="flags">${flags}</ul>` : ''}
       </div>
@@ -448,7 +449,8 @@
   function signalsText() {
     const s = state.signals;
     if (!s) return '';
-    const lines = Object.entries(SIGNAL_TITLES).map(([k, t]) => (s[k] ? `${t}: ${s[k].name} — ${s[k].meaning}${s[k].detail ? ` (${s[k].detail})` : ''}` : null)).filter(Boolean);
+    const head = s.signalDate ? [`신호 기준일: 미국 ${s.signalDate} 종가`] : [];
+    const lines = head.concat(Object.entries(SIGNAL_TITLES).map(([k, t]) => (s[k] ? `${t}: ${s[k].name} — ${s[k].meaning}${s[k].detail ? ` (${s[k].detail})` : ''}` : null)).filter(Boolean));
     if (s.flags && s.flags.length) lines.push('주의 신호: ' + s.flags.join(' / '));
     return lines.join('\n');
   }
@@ -515,6 +517,7 @@
     const s = state.signals || {};
     ['curve', 'stockRate', 'alignment', 'dollar', 'vix', 'korea', 'phase'].forEach((k) => { rec[`자동_${SIGNAL_TITLES[k]}`] = s[k] ? s[k].name : ''; });
     rec['자동_주의 신호'] = (s.flags || []).join(' / ');
+    rec['신호 기준일'] = s.signalDate || '';
     const checks = C.daily.filter((sec) => d[`확인_${sec.title}`]).length;
     rec['확인한 섹션'] = `${checks}/${C.daily.length}`;
     for (let i = 1; i <= 3; i++) {

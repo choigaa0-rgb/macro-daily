@@ -43,6 +43,21 @@ t('목업 전체 신호 계산', () => {
   assert.ok(all.phase);
 });
 
+t('날짜 맞추기: 금리 11-05, 주식 11-06이면 신호는 11-05 기준', () => {
+  const all = S.all(mock.items);
+  assert.strictEqual(all.signalDate, '2026-11-05');
+  assert.strictEqual(all.dateMismatch, true);
+  // 11-05 S&P500은 하락(-0.85%) → 금리 상승과 묶여 '나쁜 금리 상승'
+  assert.strictEqual(all.stockRate.name, '나쁜 금리 상승');
+  // 맞추지 않았다면 최신 S&P500(+0.52%)과 묶여 '좋은 금리 상승'이 됐을 것
+  assert.strictEqual(S.stockRate(mock.items.us10y.chg, mock.items.spx.chg).name, '좋은 금리 상승');
+});
+
+t('날짜 맞추기: 한국은 최신 서울 장으로 비교', () => {
+  const all = S.all(mock.items);
+  assert.ok(all.korea.detail.includes('-1.48'));
+});
+
 t('한국: 미국 상승인데 KOSPI 하락', () => {
   const items = { spx: { ok: true, chg: 0.8 }, sox: { ok: true, chg: 1.2 }, kospi: { ok: true, chg: -0.9 }, usdkrw: { ok: true, chg: 0.5, value: 1420, prev: 1408 } };
   const k = S.korea(items);

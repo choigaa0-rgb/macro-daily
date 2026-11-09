@@ -158,21 +158,55 @@
     return out;
   }
 
+  // 날짜 맞추기: 미국 자산 신호는 금리(2년·10년)와 S&P500이 모두 있는 마지막 날짜 기준으로 계산
+  // (출처마다 업데이트 시점이 달라, 금리는 11/05인데 주식은 11/06인 식으로 어긋나는 것을 막음)
+  const US_IDS = ['us2y', 'us10y', 't10y2y', 'real10y', 'bei10y', 'hy', 'dow', 'spx', 'ndx', 'rut', 'sox', 'dxy', 'usdjpy', 'usdcny', 'wti', 'gold', 'copper', 'vix'];
+  const ANCHORS = ['us2y', 'us10y', 'spx'];
+  const lastDate = (it) => (it && it.ok && it.pts && it.pts.length ? it.pts[it.pts.length - 1][0] : (it && it.ok ? it.date : null));
+
+  function align(items) {
+    const dates = ANCHORS.map((id) => lastDate(items[id])).filter(Boolean).sort();
+    if (!dates.length) return { date: null, latest: null, mismatch: false, items };
+    const date = dates[0];
+    const latest = dates[dates.length - 1];
+    const out = Object.assign({}, items);
+    US_IDS.forEach((id) => {
+      const it = items[id];
+      if (!it || !it.ok || !it.pts || !it.pts.length) return;
+      let idx = -1;
+      for (let i = it.pts.length - 1; i >= 0; i--) { if (it.pts[i][0] <= date) { idx = i; break; } }
+      if (idx < 0) return;
+      const val = it.pts[idx][1];
+      const prev = idx > 0 ? it.pts[idx - 1][1] : null;
+      let chg = null;
+      if (prev != null) chg = it.chgUnit === 'bp' ? Math.round((val - prev) * 1000) / 10 : Math.round(((val - prev) / prev) * 10000) / 100;
+      out[id] = Object.assign({}, it, { value: val, prev, chg, date: it.pts[idx][0] });
+    });
+    return { date, latest, mismatch: date !== latest, items: out };
+  }
+
   function all(items) {
-    const pct = (id) => c(items, id);
+    const A = align(items);
+    const us = A.items;
+    // 한국 전이: 미국은 기준일(전날 뉴욕 종가), 한국은 최신(그 뒤 열린 서울 장)으로 비교
+    const kr = Object.assign({}, us, { kospi: items.kospi, kosdaq: items.kosdaq, usdkrw: items.usdkrw });
+    const pct = (id) => c(us, id);
     return {
-      curve: curve(c(items, 'us2y'), c(items, 'us10y')),
-      stockRate: stockRate(c(items, 'us10y'), pct('spx')),
+      signalDate: A.date,
+      dateMismatch: A.mismatch,
+      latestDate: A.latest,
+      curve: curve(c(us, 'us2y'), c(us, 'us10y')),
+      stockRate: stockRate(c(us, 'us10y'), pct('spx')),
       alignment: alignment({ dow: pct('dow'), spx: pct('spx'), ndx: pct('ndx'), rut: pct('rut') }),
-      decompose: decompose(c(items, 'real10y'), c(items, 'bei10y'), c(items, 'us10y')),
-      dollar: dollar(pct('dxy'), c(items, 'us2y'), pct('vix'), pct('spx')),
-      vix: vixRegime(v(items, 'vix')),
+      decompose: decompose(c(us, 'real10y'), c(us, 'bei10y'), c(us, 'us10y')),
+      dollar: dollar(pct('dxy'), c(us, 'us2y'), pct('vix'), pct('spx')),
+      vix: vixRegime(v(us, 'vix')),
       hy: hyRegime(v(items, 'hy')),
-      korea: korea(items),
-      phase: phase(items),
-      flags: flags(items),
+      korea: korea(kr),
+      phase: phase(us),
+      flags: flags(us),
     };
   }
 
-  return { curve, stockRate, alignment, decompose, vixRegime, hyRegime, dollar, korea, phase, flags, all };
+  return { curve, stockRate, alignment, decompose, vixRegime, hyRegime, dollar, korea, phase, flags, align, all };
 });
