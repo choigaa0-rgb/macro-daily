@@ -31,6 +31,15 @@ const good = { status: 200, body: { candidates: [{ content: { parts: [{ text: '�
   assert.strictEqual(r.out.ok, false); assert.ok(r.out.error.includes('몇 분 뒤'));
   console.log('ok - 계속 몰리면 안내 문구');
 
+  r = await run([{ status: 400, body: { error: { message: 'Unknown name "thinkingLevel" at generation_config.thinking_config' } } }, good]);
+  assert.strictEqual(r.out.ok, true); assert.strictEqual(r.calls, 2);
+  console.log('ok - thinking 설정을 모르는 모델이면 설정 빼고 다시 보냄');
+
+  global.fetch = async () => { const e = new Error('The operation was aborted due to timeout'); throw e; };
+  const t = await lib.callGemini({ system: 's', parts: [{ text: 'x' }] });
+  assert.strictEqual(t.ok, false); assert.ok(t.error.includes('50초'));
+  console.log('ok - 시간 초과면 바로 안내');
+
   r = await run([{ status: 400, body: { error: { message: 'bad key' } } }]);
   assert.strictEqual(r.out.ok, false); assert.strictEqual(r.calls, 1);
   console.log('ok - 키 오류 등은 재시도하지 않음');
