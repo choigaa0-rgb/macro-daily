@@ -54,7 +54,7 @@ window.CONFIG = {
       id: 'equity', no: 3, title: '주식', lead: '위험 선호의 크기와 자금 이동 방향.',
       items: ['dow', 'spx', 'ndx', 'rut', 'sox'],
       signals: ['alignment', 'stockRate'],
-      links: [{ label: 'Finviz 히트맵', url: 'https://finviz.com/map.ashx' }, { label: 'CNBC Markets', url: 'https://www.cnbc.com/markets/' }],
+      links: [{ label: 'Finviz 섹터 그룹', url: 'https://finviz.com/groups.ashx?g=sector&v=140&o=name' }, { label: 'Finviz 히트맵', url: 'https://finviz.com/map.ashx' }, { label: 'KRX 전체지수 시세', url: 'https://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020103' }, { label: 'CNBC Markets', url: 'https://www.cnbc.com/markets/' }],
       questions: ['지수 배열이 깨졌나? 깨졌다면 왜?', '주식-금리 조합은 어느 칸인가?', '섹터 흐름이 금리·달러·유가와 일치하나?'],
       manual: [
         { key: '초과 상승 섹터', type: 'text', placeholder: '예: 에너지, 금융' },

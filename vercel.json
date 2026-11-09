@@ -17,6 +17,9 @@
     },
     "api/company.js": {
       "maxDuration": 60
+    },
+    "api/sectors.js": {
+      "maxDuration": 30
     }
   }
 }

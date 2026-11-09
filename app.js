@@ -168,6 +168,66 @@
   }
 
   // ---------- 매일 점검 ----------
+  // ---------- 섹터 등락 (매일 점검 03 주식) ----------
+  async function loadSectors() {
+    state.sectorBusy = true; renderSectors();
+    try { state.sectors = await api('/api/sectors' + (settings().mock ? '?mock=1' : '')); }
+    catch (e) { state.sectors = { us: { ok: false, error: e.message, rows: [] }, kr: { ok: false, error: e.message, rows: [] } }; }
+    state.sectorBusy = false; renderSectors();
+  }
+  function sectorBars(rows, key, label) {
+    const list = rows.filter((r) => r[key] != null).slice().sort((a, b) => b[key] - a[key]);
+    if (!list.length) return '<p class="muted small">1주 비교 자료가 없습니다.</p>';
+    const max = Math.max(...list.map((r) => Math.abs(r[key])), 0.5);
+    return `<ul class="sbar">${list.map((r) => {
+      const v = r[key], w = (Math.abs(v) / max) * 50;
+      const dir = v > 0 ? 'up' : v < 0 ? 'down' : '';
+      return `<li><span class="sb-n">${esc(label(r))}</span><span class="sb-t"><i class="sb-z"></i><i class="sb-b ${dir}" style="${v >= 0 ? 'left' : 'right'}:50%;width:${w.toFixed(1)}%"></i></span><span class="sb-v ${dir}">${signed(v, 2, '%')}</span></li>`;
+    }).join('')}</ul>`;
+  }
+  function sectorPanel(kind) {
+    const S0 = state.sectors && state.sectors[kind];
+    const key = state.secPeriod || 'd1';
+    const title = kind === 'us' ? '미국 섹터' : '한국 코스피 업종';
+    const link = kind === 'us'
+      ? '<a href="https://finviz.com/groups.ashx?g=sector&v=140&o=name" target="_blank" rel="noopener">Finviz Groups</a>'
+      : '<a href="https://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020103" target="_blank" rel="noopener">KRX 전체지수 시세</a>';
+    let body;
+    if (!S0) body = `<p class="muted small">${state.sectorBusy ? '불러오는 중…' : '데이터를 불러오면 나옵니다.'}</p>`;
+    else if (!S0.ok) body = S0.needKey
+      ? `<p class="muted small">한국 업종 등락은 KRX Open API 키가 있어야 자동으로 나옵니다. <b>openapi.krx.co.kr</b>에서 인증키를 받고 '코스피 시리즈 일별시세정보' 이용 신청을 한 뒤, Vercel 환경변수 <code>KRX_API_KEY</code>에 넣으세요. 그 전에는 ${link}에서 직접 확인하세요.</p>`
+      : `<p class="err small">${esc(S0.error || '불러오지 못했습니다')}</p>`;
+    else body = sectorBars(S0.rows, key, kind === 'us' ? (r) => r.ko : (r) => r.name);
+    const meta = S0 && S0.ok ? `${esc(S0.date || '')} 종가${key === 'w1' && S0.weekBase ? ` · ${esc(S0.weekBase)} 대비` : ''}` : '';
+    return `<div class="sec-panel"><div class="sp-head"><b>${title}</b><span class="muted small">${meta}</span></div>${body}
+      <div class="sp-foot muted small">${S0 && S0.ok ? esc(S0.source) + ' · ' : ''}원자료 ${link}</div></div>`;
+  }
+  function renderSectors() {
+    const box = $('#sectorBox');
+    if (!box) return;
+    const key = state.secPeriod || 'd1';
+    box.innerHTML = `<div class="sec-bar-head"><h3>섹터 등락</h3>
+      <div class="seg" role="group" aria-label="기간"><button type="button" class="${key === 'd1' ? 'on' : ''}" data-act="sec-period" data-val="d1">1일</button><button type="button" class="${key === 'w1' ? 'on' : ''}" data-act="sec-period" data-val="w1">1주</button></div>
+      <button class="btn mini" type="button" data-act="sec-fill" ${state.sectors ? '' : 'disabled'}>상위·하위 섹터를 아래 칸에 넣기</button></div>
+      <div class="sec-panels">${sectorPanel('us')}${sectorPanel('kr')}</div>`;
+  }
+  function sectorFill() {
+    const key = state.secPeriod || 'd1';
+    const pick = (kind, label) => {
+      const S0 = state.sectors && state.sectors[kind];
+      if (!S0 || !S0.ok) return null;
+      const l = S0.rows.filter((r) => r[key] != null).slice().sort((a, b) => b[key] - a[key]);
+      const f = (r) => `${label(r)} ${signed(r[key], 1, '%')}`;
+      return { top: l.slice(0, 3).filter((r) => r[key] > 0).map(f).join(', '), bot: l.slice(-3).reverse().filter((r) => r[key] < 0).map(f).join(', ') };
+    };
+    const us = pick('us', (r) => r.ko), kr = pick('kr', (r) => r.name);
+    const tag = key === 'w1' ? '(1주) ' : '';
+    const join = (k) => [us && us[k] ? `미국 ${us[k]}` : '', kr && kr[k] ? `한국 ${kr[k]}` : ''].filter(Boolean).join(' / ');
+    if (join('top')) setField('초과 상승 섹터', tag + join('top'));
+    if (join('bot')) setField('초과 하락 섹터', tag + join('bot'));
+    toast('섹터를 칸에 넣었습니다', 'ok');
+  }
+
   function renderDaily() {
     const sig = state.signals || {};
     $('#dailySections').innerHTML = C.daily.map((sec) => {
@@ -198,6 +258,7 @@
           <label class="check"><input type="checkbox" data-key="확인_${esc(sec.title)}" /> 확인</label>
         </header>
         ${tiles ? `<div class="tiles">${tiles}</div>` : ''}
+        ${sec.id === 'equity' ? '<div class="sector-box" id="sectorBox"></div>' : ''}
         ${sigs ? `<div class="signals">${sigs}</div>` : ''}
         ${releases}
         ${manual ? `<div class="fields">${manual}</div>` : ''}
@@ -1356,6 +1417,7 @@
       setStatus(`데이터를 불러오지 못했습니다: ${e.message} — 설정에서 '목업 데이터'로 화면을 확인할 수 있습니다.`, 'err');
     }
     rerenderData(true);
+    loadSectors();
   }
   function setStatus(msg, kind) {
     const b = $('#statusBar');
@@ -1365,6 +1427,7 @@
   function rerenderData(keepDom = true) {
     const draft = keepDom ? Object.assign({}, store.get(draftKey(), {}), collect($('#view-daily'))) : store.get(draftKey(), {});
     renderDaily();
+    renderSectors();
     renderOverview();
     restore($('#dailySections'), draft);
     updateSurprises();
@@ -1677,6 +1740,8 @@
         const a = act.dataset.act;
         if (a === 'goto-conclusion') { gotoTab('daily'); setTimeout(() => $('#conclusionPanel').scrollIntoView({ behavior: 'smooth' }), 50); return; }
         if (a === 'goto-center') { e.preventDefault(); gotoTab('center'); return; }
+        if (a === 'sec-period') { state.secPeriod = act.dataset.val; renderSectors(); return; }
+        if (a === 'sec-fill') { sectorFill(); return; }
         if (a === 'ai-chief') { runChief(); return; }
         if (a === 'load-morning') { loadMorning(false); return; }
         if (a === 'load-industry') { loadIndustry(false); return; }

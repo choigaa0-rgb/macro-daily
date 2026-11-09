@@ -986,3 +986,31 @@ html.themed .co-mini-name { color: var(--t-accent); }
   html.themed .ind-tag, html.themed .co-mini-name { color: var(--t-line); }
   html.themed .tab.active, html.themed .tab.active:hover { color: var(--t-side); }
 }
+
+/* ===== 섹터 등락 막대 (매일 점검 03 주식) ===== */
+.sector-box { margin: 14px 0 4px; }
+.sec-bar-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.sec-bar-head h3 { margin: 0; font-size: 15px; }
+.sec-bar-head .btn.mini { margin-left: auto; font-size: 12px; padding: 5px 11px; }
+.seg { display: inline-flex; background: var(--paper-2); border: 1px solid var(--card-line, var(--line)); border-radius: 999px; padding: 2px; }
+.seg button { font: inherit; font-size: 12.5px; font-weight: 650; border: 0; background: transparent; color: var(--ink-3); padding: 4px 12px; border-radius: 999px; cursor: pointer; }
+.seg button.on { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.sec-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sec-panel { border: 1px solid var(--card-line, var(--line)); border-radius: 16px; padding: 14px 16px 12px; min-width: 0; }
+.sp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.sp-head b { font-size: 14px; }
+.sp-foot { margin-top: 8px; }
+.sp-foot a { color: inherit; }
+.sbar { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.sbar li { display: grid; grid-template-columns: 92px minmax(0, 1fr) 58px; align-items: center; gap: 8px; font-size: 12.5px; }
+.sb-n { text-align: right; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-t { position: relative; height: 14px; }
+.sb-z { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--line); }
+.sb-b { position: absolute; top: 1px; bottom: 1px; border-radius: 3px; background: var(--ink-3); min-width: 2px; }
+.sb-b.up { background: var(--up); opacity: .85; border-radius: 0 4px 4px 0; }
+.sb-b.down { background: var(--down); opacity: .85; border-radius: 4px 0 0 4px; }
+.sb-v { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-3); }
+.sb-v.up { color: var(--up); } .sb-v.down { color: var(--down); }
+.err.small, p.small { font-size: 12.5px; }
+@media (max-width: 1100px) { .sec-panels { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .sbar li { grid-template-columns: 78px minmax(0, 1fr) 54px; } }
