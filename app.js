@@ -180,7 +180,7 @@
           <div class="fields">${field({ key: 'GDPNow 추정치(%)', type: 'number', placeholder: '예: 2.4' })}${field({ key: 'GDPNow 이전(%)', type: 'number', placeholder: '예: 2.1' })}</div>`;
       }
       const qs = sec.questions.map((q) => `<li>${esc(q)}</li>`).join('');
-      const links = sec.links.map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)} ↗</a>`).join('');
+      const links = sec.links.map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join('');
       return `<article class="card sec" id="sec-${sec.id}">
         <header class="sec-head">
           <span class="sec-no">${String(sec.no).padStart(2, '0')}</span>
@@ -445,7 +445,7 @@
       <p>내 해석이 <b>맞는지 확인하거나 뒤집을 수 있는</b> 이벤트를 고릅니다.</p>
       ${story && nextMap[story] ? `<p class="rec">"${esc(story)}" 이야기라면: <b>${esc(nextMap[story])}</b></p>` : ''}
       <p>한국은 <b>외국인 순매수 지속 여부</b>, <b>수출 데이터(매월 1일·11일·21일경)</b>, 금통위를 함께 봅니다.</p>
-      <p>형식: [이벤트] — [이렇게 나오면 뷰 강화 / 저렇게 나오면 수정] · <a href="https://kr.investing.com/economic-calendar/" target="_blank" rel="noopener">경제 캘린더 ↗</a></p>`;
+      <p>형식: [이벤트] — [이렇게 나오면 뷰 강화 / 저렇게 나오면 수정] · <a href="https://kr.investing.com/economic-calendar/" target="_blank" rel="noopener">경제 캘린더</a></p>`;
 
     // ⑦ 전망
     const mine = state.scored ? state.scored.sum : null;
@@ -645,7 +645,7 @@
       <div class="agent chief">
         <p>토론을 다 들었으면 이제 <b>내가 센터장</b>으로 결론을 씁니다. BULL과 BEAR 중 무엇을 받아들이고 무엇을 남겨둘지 정하세요.</p>
         <div class="chief-actions">
-          <button class="btn primary" data-act="goto-conclusion" type="button" ${D.risk ? '' : 'disabled'}>내가 결론 쓰기 →</button>
+          <button class="btn primary" data-act="goto-conclusion" type="button" ${D.risk ? '' : 'disabled'}>내가 결론 쓰기</button>
           <button class="btn" data-act="ai-chief" type="button" ${D.risk && !run.stage ? '' : 'disabled'}>${run.stage === 'chief' ? 'AI 센터장 작성 중…' : 'AI 센터장 결론 만들기'}</button>
         </div>
         <p class="muted">AI 센터장 결론은 '오늘의 브리핑' 탭에 표시되고, 내 결론과는 따로 저장돼 출처별 적중률로 비교됩니다.</p>
@@ -792,7 +792,7 @@
         <div class="report-block cross-report">
           <h3>② 증권사 리포트와 대조</h3>
           <ol class="steps">
-            <li><a href="https://consensus.hankyung.com/analysis/list?skinType=market" target="_blank" rel="noopener">한경컨센서스 시장 리포트 ↗</a>에서 오늘 날짜의 데일리·시황 리포트를 하나 고릅니다.</li>
+            <li><a href="https://consensus.hankyung.com/analysis/list?skinType=market" target="_blank" rel="noopener">한경컨센서스 시장 리포트</a>에서 오늘 날짜의 데일리·시황 리포트를 하나 고릅니다.</li>
             <li>PDF를 올리거나 핵심 부분을 붙여넣고 <b>AI로 교차검증</b>을 누르면, 오늘의 결론과 일치도·다른 점·숫자 차이·보완 제안을 정리합니다.</li>
           </ol>
           <label class="fld wide"><span>참고 리포트</span><input type="text" data-key="참고 리포트" placeholder="증권사 · 리포트 제목" /></label>
@@ -809,6 +809,37 @@
       </div>`;
   }
 
+  // 브리핑 맨 위: 오늘 꼭 보는 숫자 6개 (한국식 등락색)
+  function areaSpark(arr) {
+    if (!arr || arr.length < 3) return '';
+    const a = arr.slice(-40);
+    const w = 120, h = 36;
+    const min = Math.min(...a), max = Math.max(...a), span = max - min || 1;
+    const xy = a.map((v, i) => [(i / (a.length - 1)) * w, h - 3 - ((v - min) / span) * (h - 8)]);
+    const line = xy.map((p) => p.map((n) => n.toFixed(1)).join(',')).join(' ');
+    return `<svg class="kpi-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><polygon points="0,${h} ${line} ${w},${h}" /><polyline points="${line}" /></svg>`;
+  }
+  function keyStrip() {
+    if (!state.market) return '';
+    const items = state.market.items;
+    const pick = [['us10y', '미국 10년물'], ['us2y', '미국 2년물'], ['usdkrw', '원달러'], ['spx', 'S&P500'], ['kospi', 'KOSPI'], ['vix', 'VIX']];
+    const cells = pick.map(([id, label]) => {
+      const it = items[id];
+      if (!it || !it.ok) return '';
+      const def = C.indicators[id] || { digits: 2 };
+      const u = it.chgUnit === 'bp' ? 'bp' : '%';
+      const dir = it.chg > 0 ? 'up' : it.chg < 0 ? 'down' : '';
+      return `<div class="kpi"><div class="kpi-top"><span class="kpi-l">${esc(label)}</span><span class="pill ${dir}">${signed(it.chg, u === 'bp' ? 1 : 2, u)}</span></div>
+        <div class="kpi-v">${num(it.value, def.digits)}${def.unit === '%' ? '<small>%</small>' : ''}</div>${areaSpark(it.spark)}</div>`;
+    }).join('');
+    return cells ? `<div class="kpi-grid">${cells}</div>` : '';
+  }
+  function niceDate(d) {
+    const t = new Date(d + 'T00:00:00+09:00');
+    if (isNaN(t)) return d;
+    return `${t.getMonth() + 1}월 ${t.getDate()}일 ${'일월화수목금토'[t.getDay()]}요일`;
+  }
+
   function renderBrief() {
     const body = $('#briefBody');
     if (!body) return;
@@ -819,47 +850,69 @@
     const busy = !!run.stage;
     const stageName = busy ? (STAGES.find((x) => x.id === run.stage) || {}).name : '';
     const src = state.aiSrc;
-    const fc = b && b['전망'] ? `<div class="fc-chips">${S.FORECASTS.map((f) => { const v = b['전망'][f.key.replace('전망_', '')]; return v ? `<span class="chip ${v === '상승' ? 'bad' : v === '하락' ? 'info' : ''}">${esc(f.label)} ${esc(v)}</span>` : ''; }).join('')}</div>` : '';
-    const chips = ['curve', 'stockRate', 'alignment', 'dollar', 'korea', 'phase'].map((k) => sig[k] ? `<span class="chip ${sig[k].tone}"><b>${esc(SIGNAL_TITLES[k])}</b> ${esc(sig[k].name)}</span>` : '').join('');
+    const fc = b && b['전망'] ? `<div class="fc-chips">${S.FORECASTS.map((f) => { const v = b['전망'][f.key.replace('전망_', '')]; return v ? `<span class="fc ${v === '상승' ? 'up' : v === '하락' ? 'down' : ''}">${esc(f.label.replace(/ (상승|하락)$/, ''))} <b>${esc(v)}</b></span>` : ''; }).join('')}</div>` : '';
+    const sigRows = ['curve', 'stockRate', 'alignment', 'dollar', 'korea', 'phase'].map((k) => sig[k] ? `<li><span class="sg-l">${esc(SIGNAL_TITLES[k])}</span><span class="sg-v ${sig[k].tone}">${esc(sig[k].name)}</span></li>` : '').join('');
     const sv = sig.sectors;
+    const meta = `${src ? `${esc(src.source)}${src.at ? ` · ${esc(src.at)}` : ''}${src.model ? ` · ${esc(src.model)}` : ''}` : '아직 오늘 브리핑이 없습니다'}${sig.signalDate ? ` · 미국 ${esc(sig.signalDate)} 종가 기준` : ''}`;
     body.innerHTML = `
-      <div class="card brief-hero">
-        <div class="wk-head"><div>
-          <div class="brief-date">${esc(state.date)} 아침 브리핑</div>
-          <div class="muted">${src ? `${esc(src.source)}${src.at ? ` · ${esc(src.at)}` : ''}${src.model ? ` · ${esc(src.model)}` : ''}` : '아직 오늘 브리핑이 없습니다'}${sig.signalDate ? ` · 미국 ${esc(sig.signalDate)} 종가 기준` : ''}</div>
+      <header class="page-head">
+        <div>
+          <div class="ph-kicker">아침 브리핑</div>
+          <h1 class="ph-title">${esc(niceDate(state.date))}</h1>
+          <div class="ph-meta">${meta}</div>
         </div>
         <div class="rec-actions">
           <button class="btn" data-act="load-morning" type="button" ${busy ? 'disabled' : ''}>아침 브리핑 불러오기</button>
           <button class="btn primary" id="briefMake" type="button" ${busy ? 'disabled' : ''}>${busy ? `${esc(stageName)} 진행 중…` : b ? '다시 만들기' : '지금 브리핑 만들기'}</button>
-        </div></div>
-        ${run.error ? `<div class="err">${esc(run.error)} <button class="btn mini" data-act="debate-resume" type="button">이 단계부터 다시</button></div>` : ''}
-        ${state.morningMsg && !b ? `<p class="muted">${esc(state.morningMsg)}</p>` : ''}
-        ${D.headline ? `<p class="headline">${esc(D.headline)}</p>` : ''}
-        <div class="chips">${chips}</div>
-      </div>
+        </div>
+      </header>
+      ${run.error ? `<div class="err">${esc(run.error)} <button class="btn mini" data-act="debate-resume" type="button">이 단계부터 다시</button></div>` : ''}
+      ${keyStrip()}
 
-      ${b ? `<div class="card brief-concl">
-        <div class="wk-head"><h2>오늘의 결론 <span class="muted">AI 센터장</span></h2><span class="ai-warn">AI 분석 · 교차검증 필요</span></div>
-        <p class="concl-text">${esc(b['종합 해석'] || '')}</p>
-        <table class="g-table concl-tbl">${CONCL_ROWS.filter((k) => b[k]).map((k) => `<tr><th>${esc(k)}</th><td>${esc(b[k])}</td></tr>`).join('')}</table>
-        <p class="muted" style="margin:8px 0 2px">5거래일 전망</p>${fc}
-        <div class="brief-links"><a href="#" data-act="goto-center">토론 전체 보기 →</a> <a href="#" data-act="copy-ai-concl">내 결론 칸에 복사해서 고치기 →</a></div>
-      </div>` : `<div class="card"><p class="muted">평일 아침 7~8시에 자동으로 만들어집니다. 지금 바로 보려면 <b>지금 브리핑 만들기</b>를 누르세요 (데이터 → 토론 → 결론, 1~2분).</p></div>`}
+      <div class="bento">
+        ${b ? `<section class="card concl-hero span-8">
+          <div class="ch-top"><span class="ch-l">오늘의 결론 · AI 센터장</span><span class="ch-warn">교차검증 필요</span></div>
+          ${D.headline ? `<p class="ch-head">${esc(D.headline)}</p>` : ''}
+          <p class="ch-text">${esc(b['종합 해석'] || '')}</p>
+          <div class="ch-fc"><span class="ch-l">5거래일 전망</span>${fc}</div>
+          <div class="ch-links"><a href="#" data-act="goto-center">토론 전체 보기</a><a href="#" data-act="copy-ai-concl">내 결론 칸에 복사해서 고치기</a></div>
+        </section>` : `<section class="card concl-hero empty span-8">
+          <span class="ch-l">오늘의 결론</span>
+          ${D.headline ? `<p class="ch-head">${esc(D.headline)}</p>` : ''}
+          <p class="ch-text">${state.morningMsg ? esc(state.morningMsg) + ' ' : ''}평일 아침 7~8시에 자동으로 만들어집니다. 지금 보려면 <b>지금 브리핑 만들기</b>를 누르세요. 데이터 수집, 토론, 결론까지 1~2분 걸립니다.</p>
+        </section>`}
 
-      ${D.open ? `<div class="card"><h2>BULL vs BEAR <span class="muted">${D.risk ? `리스크 팀: ${esc(D.risk.balance || '')}` : ''}</span></h2>
-        <div class="bb2"><div><b class="t-bull">BULL</b> ${esc(D.open.bull ? D.open.bull.claim : '')}</div><div><b class="t-bear">BEAR</b> ${esc(D.open.bear ? D.open.bear.claim : '')}</div></div>
-        ${D.risk ? `<p><b>핵심 쟁점</b> ${esc(D.risk.key_issue || '')}</p><p class="muted">BULL이 틀렸다고 볼 신호: ${esc(D.risk.bull_wrong_if || '')} · BEAR가 틀렸다고 볼 신호: ${esc(D.risk.bear_wrong_if || '')}</p>` : ''}
-      </div>` : ''}
+        <section class="card span-4">
+          <h2>자동 신호 <span class="muted">규칙 기반</span></h2>
+          ${sigRows ? `<ul class="sig-list">${sigRows}</ul>` : '<p class="muted">데이터를 불러오면 나옵니다.</p>'}
+        </section>
 
-      ${state.industry ? `<div class="card"><div class="wk-head"><h2>산업 이슈 <span class="muted">${esc(state.industry.headline || '')}</span></h2><a href="#" data-act="goto-industry">전체 보기 →</a></div>
-        <ul class="mini-list">${state.industry.issues.slice(0, 4).map((it) => `<li><span class="ind-tag">${esc(it.industry)}</span> ${esc(it.title)} <span class="badge ${IMPACT_TONE[it.impact] || 'neutral'}">${esc(it.impact || '')}</span></li>`).join('')}</ul></div>` : ''}
-      ${state.company ? `<div class="card"><div class="wk-head"><h2>오늘의 기업 <span class="muted">${esc(state.company.data.company.name)}</span></h2><a href="#" data-act="goto-company">카드 보기 →</a></div>
-        <p>${esc((state.company.card || {}).one_liner || '')}</p><p class="muted">${esc(state.company.reason || '')}</p></div>` : ''}
+        ${b ? `<section class="card span-7">
+          <h2>결론 세부</h2>
+          <table class="g-table concl-tbl">${CONCL_ROWS.filter((k) => b[k]).map((k) => `<tr><th>${esc(k)}</th><td>${esc(b[k])}</td></tr>`).join('')}</table>
+        </section>` : ''}
 
-      ${sv && (sv.fav.length || sv.unfav.length) ? `<div class="card"><h2>섹터 시사점 <span class="muted">규칙 기반</span></h2>
-        ${sv.fav.length ? `<p><b class="t-bull">유리</b> ${sv.fav.map((x) => `${esc(x.sector)} <span class="muted">(${esc(x.why.join(', '))})</span>`).join(' · ')}</p>` : ''}
-        ${sv.unfav.length ? `<p><b class="t-bear">불리</b> ${sv.unfav.map((x) => `${esc(x.sector)} <span class="muted">(${esc(x.why.join(', '))})</span>`).join(' · ')}</p>` : ''}
-      </div>` : ''}`;
+        ${D.open ? `<section class="card ${b ? 'span-5' : 'span-12'}">
+          <h2>BULL vs BEAR ${D.risk ? `<span class="muted">리스크 팀: ${esc(D.risk.balance || '')}</span>` : ''}</h2>
+          <div class="duel"><div class="duel-b"><span class="duel-tag bull">BULL</span>${esc(D.open.bull ? D.open.bull.claim : '')}</div>
+          <div class="duel-b"><span class="duel-tag bear">BEAR</span>${esc(D.open.bear ? D.open.bear.claim : '')}</div></div>
+          ${D.risk ? `<p class="duel-key"><b>핵심 쟁점</b> ${esc(D.risk.key_issue || '')}</p><p class="muted small">BULL이 틀렸다고 볼 신호: ${esc(D.risk.bull_wrong_if || '')}<br>BEAR가 틀렸다고 볼 신호: ${esc(D.risk.bear_wrong_if || '')}</p>` : ''}
+        </section>` : ''}
+
+        ${state.industry ? `<section class="card span-6"><div class="wk-head"><h2>산업 이슈</h2><a href="#" data-act="goto-industry">전체 보기</a></div>
+          ${state.industry.headline ? `<p class="muted small">${esc(state.industry.headline)}</p>` : ''}
+          <ul class="mini-list">${state.industry.issues.slice(0, 4).map((it) => `<li><span class="ind-tag">${esc(it.industry)}</span><span class="ml-t">${esc(it.title)}</span><span class="badge ${IMPACT_TONE[it.impact] || 'neutral'}">${esc(it.impact || '')}</span></li>`).join('')}</ul></section>` : ''}
+        ${state.company ? `<section class="card co-mini ${state.industry ? 'span-6' : 'span-12'}"><div class="wk-head"><h2>오늘의 기업</h2><a href="#" data-act="goto-company">카드 보기</a></div>
+          <div class="co-mini-name">${esc(state.company.data.company.name)}</div>
+          <p>${esc((state.company.card || {}).one_liner || '')}</p><p class="muted small">${esc(state.company.reason || '')}</p></section>` : ''}
+
+        ${sv && (sv.fav.length || sv.unfav.length) ? `<section class="card span-12"><h2>섹터 시사점 <span class="muted">규칙 기반</span></h2>
+          <div class="sector2">
+            <div><div class="sec-h bull">유리</div>${sv.fav.length ? `<ul>${sv.fav.map((x) => `<li><b>${esc(x.sector)}</b> <span class="muted">${esc(x.why.join(', '))}</span></li>`).join('')}</ul>` : '<p class="muted">없음</p>'}</div>
+            <div><div class="sec-h bear">불리</div>${sv.unfav.length ? `<ul>${sv.unfav.map((x) => `<li><b>${esc(x.sector)}</b> <span class="muted">${esc(x.why.join(', '))}</span></li>`).join('')}</ul>` : '<p class="muted">없음</p>'}</div>
+          </div>
+        </section>` : ''}
+      </div>`;
     renderCross();
   }
 
@@ -918,7 +971,7 @@
     const busy = state.industryBusy;
     box.innerHTML = `
       <div class="card brief-hero"><div class="wk-head"><div>
-        <div class="brief-date">${esc(state.date)} 산업 이슈</div>
+        <div class="ph-kicker">산업 이슈</div><h1 class="ph-title">${esc(niceDate(state.date))}</h1>
         <div class="muted">${I ? `뉴스 ${I.newsCount}건 중 ${I.issues.length}개 이슈 · ${esc(I.model || '')}${I.macroUsed ? ' · 오늘 매크로 반영' : ''}` : esc(state.industryMsg || '불러오는 중…')}</div></div>
         <div class="rec-actions"><button class="btn" data-act="load-industry" type="button" ${busy ? 'disabled' : ''}>불러오기</button>
         <button class="btn primary" data-act="make-industry" type="button" ${busy ? 'disabled' : ''}>${busy ? '정리 중… (최대 1분)' : I ? '다시 만들기' : '지금 만들기'}</button></div></div>
@@ -932,7 +985,7 @@
         ${it.why ? `<p class="muted"><b>왜 중요한가</b> ${esc(it.why)}</p>` : ''}
         ${it.macro_link ? `<p class="macro-l"><b>매크로 연결</b> ${esc(it.macro_link)}</p>` : ''}
         ${it.companies && it.companies.length ? `<p><b>관련 기업</b> ${it.companies.map((c) => `<span class="chip ${c.inSource ? '' : 'warn'}" title="${c.inSource ? '근거 기사에 나옴' : '근거 기사에 없음 — 확인 필요'}">${esc(c.name)}${c.inSource ? '' : ' ?'}</span>`).join(' ')}</p>` : ''}
-        <div class="src-row"><span class="badge ${it.check === '근거 확인' ? 'good' : 'warn'}">${esc(it.check)}</span> ${it.links.map((l) => `<a href="${esc(l.link)}" target="_blank" rel="noopener">${esc(l.source)}: ${esc(l.title.slice(0, 40))} ↗</a>`).join('')}</div>
+        <div class="src-row"><span class="badge ${it.check === '근거 확인' ? 'good' : 'warn'}">${esc(it.check)}</span> ${it.links.map((l) => `<a href="${esc(l.link)}" target="_blank" rel="noopener">${esc(l.source)}: ${esc(l.title.slice(0, 40))}</a>`).join('')}</div>
       </div>`).join('') : ''}
       ${I && I.feedErrors && I.feedErrors.length ? `<p class="muted">일부 RSS를 읽지 못했습니다: ${esc(I.feedErrors.join(' · '))}</p>` : ''}`;
   }
@@ -976,7 +1029,7 @@
     const past = (state.companyRows || []).filter((r) => r['날짜'] !== state.date).slice(0, 12);
     box.innerHTML = `
       <div class="card brief-hero"><div class="wk-head"><div>
-        <div class="brief-date">${esc(state.date)} 오늘의 기업</div>
+        <div class="ph-kicker">오늘의 기업</div><h1 class="ph-title">${esc(niceDate(state.date))}</h1>
         <div class="muted">${c ? `${esc(c.reason)} · ${esc(c.model || '')}` : esc(state.companyMsg || '불러오는 중…')}</div></div>
         <div class="rec-actions"><button class="btn" data-act="load-rank" type="button" ${state.rankBusy ? 'disabled' : ''}>${state.rankBusy ? '계산 중…' : '주목도 상위 20 보기'}</button>
         <button class="btn primary" data-act="make-company" type="button" ${busy ? 'disabled' : ''}>${busy === 'auto' ? '분석 중… (최대 1분)' : c ? '자동 선정으로 다시 만들기' : '자동 선정해서 분석'}</button></div></div>
@@ -1122,7 +1175,7 @@
         <div class="tiles">${tiles}</div>
         <div class="signals">${signalBox('10년물 분해 (5일)', dec)}${signalBox('신용시장 (하이일드)', hy)}</div>
         <details class="qs" open><summary>생각할 질문</summary><ul>${qs}</ul></details>
-        <div class="links"><a href="https://fred.stlouisfed.org/series/BAMLH0A0HYM2" target="_blank" rel="noopener">FRED 하이일드 ↗</a><a href="https://fred.stlouisfed.org/series/T10YIE" target="_blank" rel="noopener">FRED BEI ↗</a><a href="https://fred.stlouisfed.org/series/DFII10" target="_blank" rel="noopener">FRED 실질금리 ↗</a><a href="https://www.thebell.co.kr/" target="_blank" rel="noopener">더벨 ↗</a></div>
+        <div class="links"><a href="https://fred.stlouisfed.org/series/BAMLH0A0HYM2" target="_blank" rel="noopener">FRED 하이일드</a><a href="https://fred.stlouisfed.org/series/T10YIE" target="_blank" rel="noopener">FRED BEI</a><a href="https://fred.stlouisfed.org/series/DFII10" target="_blank" rel="noopener">FRED 실질금리</a><a href="https://www.thebell.co.kr/" target="_blank" rel="noopener">더벨</a></div>
       </div>
 
       <div class="layout">
@@ -1133,7 +1186,7 @@
           </div>
           <div class="card">
             <h2>글로벌 10년물</h2>
-            <p class="hint">미국만 움직였는지, 글로벌 금리가 같이 움직였는지 비교합니다. <a href="https://stock.naver.com/market/marketindex" target="_blank" rel="noopener">네이버 시장지표 ↗</a>에서 확인해 입력하세요.</p>
+            <p class="hint">미국만 움직였는지, 글로벌 금리가 같이 움직였는지 비교합니다. <a href="https://stock.naver.com/market/marketindex" target="_blank" rel="noopener">네이버 시장지표</a>에서 확인해 입력하세요.</p>
             <div class="fields global10">
               ${['독일', '일본', '중국', '한국'].map((c) => `<label class="fld"><span>${c} 10년(%)</span><input type="number" step="any" data-key="${c} 10년(%)" /><em class="vs-us" data-vs="${c} 10년(%)"></em></label>`).join('')}
             </div>
@@ -1184,7 +1237,7 @@
       </div>
       <div class="card">
         <div class="wk-head"><h2>저장된 데일리 기록</h2>
-          <div class="rec-actions">${url ? `<a class="btn ghost" href="${esc(url)}" target="_blank" rel="noopener">시트 열기 ↗</a>` : ''}<button class="btn" id="loadRecords">불러오기</button></div></div>
+          <div class="rec-actions">${url ? `<a class="btn ghost" href="${esc(url)}" target="_blank" rel="noopener">시트 열기</a>` : ''}<button class="btn" id="loadRecords">불러오기</button></div></div>
         <div id="recordsTable"><span class="muted">'불러오기'를 누르면 구글 시트의 기록을 가져옵니다.</span></div>
       </div>`;
   }
