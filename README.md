@@ -100,6 +100,11 @@ Vercel 프로젝트 → **Settings → Environment Variables**에 아래를 추�
 - FedWatch, Fear & Greed, 섹터, 외국인 수급은 무료 공식 API가 없어 링크 + 직접 입력 방식입니다.
 - 자동 해석의 기준치(VIX 20, 하이일드 4% 등)는 경험적 참고치입니다.
 
+## AI가 느리거나 안 될 때
+- 기본 모델이 약 28초 안에 답하지 않거나 사용자가 몰리면, **이름에 flash-lite가 들어간 가벼운 모델로 자동 전환**합니다. 결과 아래에 실제로 쓴 모델명이 표시됩니다.
+- 내 키로 쓸 수 있는 모델 목록과 자동으로 고른 가벼운 모델은 `대시보드주소/api/models?pass=앱비밀번호` 에서 확인할 수 있습니다.
+- 특정 모델을 쓰고 싶으면 Vercel 환경변수 `GEMINI_MODEL`(기본), `GEMINI_FALLBACK_MODEL`(예비)에 이름을 넣으세요.
+
 ## 로컬에서 확인하기 (선택)
 ```
 node tests/dev-server.js     # http://localhost:3000 (시트 대신 메모리 속 가짜 시트 사용)
