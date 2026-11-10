@@ -8,9 +8,10 @@ function sendJson(res, status, body) {
 }
 
 const NEED_PASS = '새로 만들기와 저장은 관리자 비밀번호가 필요합니다. 매일 아침 자동으로 만들어진 결과는 비밀번호 없이 \'불러오기\'로 볼 수 있습니다.';
-const DEMO_NO_SAVE = '체험용 비밀번호로는 시트에 저장되지 않습니다. 화면에 나온 결과는 그대로 볼 수 있습니다.';
-// 요청한 사람의 권한: 'admin'(관리자·아침 자동 실행) | 'demo'(체험용: AI 실행은 되고 저장은 안 됨) | null
+const DEMO_NO_SAVE = '체험 모드에서는 시트에 저장되지 않습니다. 화면에 나온 결과는 그대로 볼 수 있습니다.';
+// 요청한 사람의 권한: 'admin'(관리자·아침 자동 실행) | 'demo'(체험 모드: AI 실행은 되고 저장은 안 됨) | null
 // APP_PASSCODE를 설정하지 않았으면(로컬 개발) 누구나 관리자
+// 비밀번호 없이 들어온 사람은 기본으로 체험 모드. OPEN_DEMO=0 이면 끄고, 그때는 DEMO_PASSCODE가 있어야 체험 모드
 function role(req) {
   const admin = process.env.APP_PASSCODE;
   if (!admin) return 'admin';
@@ -20,6 +21,7 @@ function role(req) {
   if (process.env.CRON_SECRET && req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`) return 'admin';
   const demo = process.env.DEMO_PASSCODE;
   if (demo && given && given === demo) return 'demo';
+  if (process.env.OPEN_DEMO !== '0') return 'demo';
   return null;
 }
 // 통과하면 권한 문자열을 돌려주고, 아니면 401 응답 후 null
