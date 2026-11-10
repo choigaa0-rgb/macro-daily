@@ -1207,3 +1207,52 @@ details.x-det[open] { padding-bottom: 12px; }
 .fc-mini.up { background: var(--up-bg); color: var(--up); } .fc-mini.down { background: var(--down-bg); color: var(--down); }
 .rec-body { font-size: 13.5px; line-height: 1.7; padding: 6px 4px; }
 @media (max-width: 640px) { .rec-list th:nth-child(3), .rec-list td:nth-child(3), .rec-list th:nth-child(5), .rec-list td:nth-child(5) { display: none; } .ac-v { font-size: 32px; } }
+
+/* ===== 휴대폰: 위는 얇은 머리, 메뉴는 아래 탭바 ===== */
+.lbl-s { display: none; }
+@media (max-width: 640px) {
+  .side { position: static; border-radius: 0 0 18px 18px; padding: 10px 14px; gap: 8px; flex-wrap: nowrap; }
+  .brand { padding: 0; gap: 8px; flex: none; }
+  .brand-mark { width: 30px; height: 30px; border-radius: 9px; }
+  .brand-title { font-size: 15px; }
+  .side-tools { gap: 6px; flex: 1; justify-content: flex-end; min-width: 0; }
+  .date-pick input { font-size: 12.5px; padding: 5px 6px; max-width: 128px; }
+  .side-btns { gap: 4px; }
+  .side-btns .btn { font-size: 11.5px; padding: 5px 9px; }
+  /* 아래 고정 탭바 */
+  .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; width: auto; display: flex; flex-direction: row; justify-content: space-around; gap: 0; padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); background: var(--side-bg, var(--accent)); border-radius: 18px 18px 0 0; box-shadow: 0 -4px 16px rgba(0, 0, 0, .12); overflow: visible; }
+  .nav-group, .nav-group + .nav-group { display: contents; border: 0; padding: 0; }
+  .nav-h { display: none; }
+  .tab { flex: 1; flex-direction: column; gap: 3px; padding: 6px 2px; font-size: 11px; border-radius: 12px; min-width: 0; }
+  .tab .ico { width: 20px; height: 20px; }
+  .tab .lbl { display: none; }
+  .tab .lbl-s { display: block; }
+  main { padding: 12px 12px calc(84px + env(safe-area-inset-bottom)); }
+  .foot { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+  .status-bar.ok { display: none; }
+  .status-bar { margin: 8px 12px 0; font-size: 11.5px; }
+  /* 브리핑 머리·숫자 카드 촘촘하게 */
+  .page-head { padding: 4px 2px 0; gap: 10px; }
+  .ph-kicker { font-size: 12.5px; }
+  .ph-title { font-size: 24px; }
+  .ph-meta { font-size: 11.5px; }
+  .page-head .rec-actions { width: 100%; }
+  .page-head .rec-actions .btn { flex: 1; font-size: 13px; padding: 9px 10px; }
+  .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .kpi { padding: 10px 10px 0; border-radius: 14px; }
+  .kpi-top { flex-direction: column; align-items: flex-start; gap: 3px; }
+  .kpi-l { font-size: 11.5px; }
+  .pill { font-size: 10.5px; padding: 1px 6px; }
+  .kpi-v { font-size: 17px; margin: 4px 0 2px; }
+  .kpi-v small { font-size: 11px; }
+  .kpi-spark { width: calc(100% + 20px); margin: 2px -10px 0; height: 26px; }
+  .concl-hero { padding: 20px 18px; }
+  .ch-text { font-size: 16.5px; line-height: 1.65; }
+}
+@media (max-width: 640px) {
+  .toast { bottom: calc(84px + env(safe-area-inset-bottom)) !important; }
+  .actor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .actor { padding: 14px; border-radius: 16px; }
+  .ac-v { font-size: 28px; }
+  .ac-bar { grid-template-columns: 44px 1fr 30px; font-size: 11px; }
+}
