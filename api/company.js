@@ -101,6 +101,11 @@ async function gather(company, news) {
     const cap = p.close * shares * (m === 'KR' ? 1 : 1);
     push('시가총액 (간이)', money(cap, m), cap);
     if (a && a.ni > 0) push('PER (간이, 최근 연간 순이익)', `${r1(cap / a.ni)}배`, r1(cap / a.ni));
+    // 최근 4분기 순이익 = 작년 연간 + 올해 누적 − 작년 같은 기간 누적 (이익이 급변할 때 연간 PER보다 현재에 가까움)
+    if (a && l && a.year === l.year - 1 && [a.ni, l.ni, l.niPrev].every((x) => typeof x === 'number')) {
+      const ttm = a.ni + l.ni - l.niPrev;
+      if (ttm > 0) push(`PER (간이, 최근 4분기 순이익 ${money(ttm, m)})`, `${r1(cap / ttm)}배`, r1(cap / ttm));
+    }
     if (a && a.equity > 0) push('PBR (간이, 최근 자본총계)', `${r1(cap / a.equity)}배`, r1(cap / a.equity));
   }
   if (p) {
