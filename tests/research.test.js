@@ -95,6 +95,9 @@ function call(handler, url, method = 'GET', body) {
   assert.deepStrictEqual([iss[0].sector, iss[0].region, iss[0].kospi_sector], ['기술', '공통', '전기·전자'], '목록 밖 태그는 목록 안으로 맞춤');
   assert.deepStrictEqual([iss[1].sector, iss[1].region], ['경기소비재', '국내']);
   assert.strictEqual(iss[0].macro_link, '', '여러 이슈에 같은 매크로 문장을 붙이면 비움');
+  const { fixTags } = require('../api/industry.js');
+  assert.strictEqual(fixTags({ sector: '기술', industry: '전력', region: '국내' }, []).sector, '유틸리티', '세부 산업이 전력이면 유틸리티');
+  assert.strictEqual(fixTags({ sector: '산업재', industry: '항공·해운', region: '국내' }, []).sector, '산업재');
   assert.ok(posted.find((p) => p.sheet === '산업 이슈'));
   fs.writeFileSync(path.join(outDir, 'industry-mail.html'), r.body.mailHtml);
   console.log('ok - 산업 이슈: 근거 없는 이슈 제거, 관련 기업 대조, 시트 저장');

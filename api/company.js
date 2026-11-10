@@ -117,18 +117,21 @@ async function gather(company, news) {
 }
 
 // 교차검증: AI 문장 속 숫자가 제공한 데이터(지표·주목도)에 있는지
+// 숫자 뽑기: 1,212,000처럼 천 단위 쉼표가 있는 숫자도 하나로 (예전엔 212,000으로 잘려 '없는 숫자'로 오인)
+const NUM_RE = /-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?/g;
+const nums = (s) => (String(s || '').match(NUM_RE) || []).map((n) => Number(n.replace(/,/g, '')));
 function verifyNumbers(card, data, attention) {
   const pool = [];
   data.metrics.forEach((x) => {
     if (typeof x.raw === 'number') pool.push(x.raw);
-    (String(x.value).match(/-?\d+(?:\.\d+)?/g) || []).forEach((n) => pool.push(Number(n)));
+    nums(x.value).forEach((n) => pool.push(n));
   });
   if (attention) [attention.chg, attention.volx, attention.news, attention.score].forEach((v) => v != null && pool.push(Number(v)));
-  (data.news || []).concat(data.filings || []).forEach((n) => (String(n.title).match(/-?\d+(?:\.\d+)?/g) || []).forEach((v) => pool.push(Number(v))));
+  (data.news || []).concat(data.filings || []).forEach((n) => nums(n.title).forEach((v) => pool.push(v)));
   const text = ['why_today', 'results', 'valuation', 'macro_link', 'kill_scenario'].map((k) => card[k] || '')
     .concat(card.bull || [], card.bear || [], card.checkpoints || []).join(' ');
   const found = [];
-  const re = /(-?\d+(?:[.,]\d+)?)\s*(%|배|조원|조|억원|억|원|달러|\$B|B|bp|만주|배수)/g;
+  const re = /(-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?)\s*(%|배|조원|조|억원|억|원|달러|\$B|B|bp|만주|배수)/g;
   let mm;
   while ((mm = re.exec(text))) {
     const n = Number(mm[1].replace(/,/g, ''));

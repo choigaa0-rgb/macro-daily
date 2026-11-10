@@ -26,36 +26,38 @@ function doPost(e) {
       MailApp.sendEmail({ to: body.to, subject: body.subject || 'Macro Daily', htmlBody: body.html || '', name: 'Macro Daily' });
       return json_({ ok: true, mailed: body.to });
     }
-    const sheetName = sheetOf_(body.sheet);
-    const record = body.record || {};
-    const lock = LockService.getScriptLock();
-    lock.waitLock(10000);
-    try {
-      const sh = getSheet_(sheetName);
-      const headers = ensureHeaders_(sh, Object.keys(record));
-      const row = headers.map(function (h) { return clean_(record[h]); });
-
-      const keyIdx = headers.indexOf(KEY_COLUMN);
-      let target = -1;
-      if (keyIdx >= 0 && sh.getLastRow() > 1) {
-        const keys = sh.getRange(2, keyIdx + 1, sh.getLastRow() - 1, 1).getDisplayValues();
-        for (let i = 0; i < keys.length; i++) {
-          if (String(keys[i][0]) === String(record[KEY_COLUMN])) { target = i + 2; break; }
-        }
-      }
-      const existed = target > 0;
-      if (existed) {
-        sh.getRange(target, 1, 1, headers.length).setValues([row]);
-      } else {
-        sh.appendRow(row);
-        target = sh.getLastRow();
-      }
-      return json_({ ok: true, sheet: sheetName, row: target, updated: existed });
-    } finally {
-      lock.releaseLock();
-    }
+    return json_(upsert_(sheetOf_(body.sheet), body.record || {}));
   } catch (err) {
     return json_({ ok: false, error: String(err) });
+  }
+}
+
+// 날짜가 같은 줄이 있으면 덮어쓰고, 없으면 새 줄 추가
+function upsert_(sheetName, record) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sh = getSheet_(sheetName);
+    const headers = ensureHeaders_(sh, Object.keys(record));
+    const row = headers.map(function (h) { return clean_(record[h]); });
+    const keyIdx = headers.indexOf(KEY_COLUMN);
+    let target = -1;
+    if (keyIdx >= 0 && sh.getLastRow() > 1) {
+      const keys = sh.getRange(2, keyIdx + 1, sh.getLastRow() - 1, 1).getDisplayValues();
+      for (let i = 0; i < keys.length; i++) {
+        if (String(keys[i][0]) === String(record[KEY_COLUMN])) { target = i + 2; break; }
+      }
+    }
+    const existed = target > 0;
+    if (existed) {
+      sh.getRange(target, 1, 1, headers.length).setValues([row]);
+    } else {
+      sh.appendRow(row);
+      target = sh.getLastRow();
+    }
+    return { ok: true, sheet: sheetName, row: target, updated: existed };
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -103,6 +105,7 @@ function morningRun() {
   if (day >= 6) return; // 주말은 쉼
   morningRunNow();
 }
+
 function morningRunNow() {
   const p = PropertiesService.getScriptProperties();
   const base = String(p.getProperty('DASHBOARD_URL') || '').replace(/\/$/, '');

@@ -171,11 +171,34 @@ function unzipFirst(buf) {
   const data = buf.subarray(start, start + csize);
   return method === 8 ? zlib.inflateRawSync(data) : data;
 }
+// 자주 쓰는 종목의 DART 고유번호. 전체 목록(corpCode.xml, 수 MB)은 해외 서버에서 받기 느려서 먼저 이걸 씀.
+// 맞는지 company.json으로 종목코드를 대조하고, 틀리면 전체 목록으로 다시 찾음 (잘못된 회사 자료를 쓰지 않도록)
+const KNOWN_CORP = {
+  '005930': '00126380', '000660': '00164779', '005380': '00164742', '000270': '00106641', '035420': '00266961',
+  '035720': '00258801', '051910': '00356361', '006400': '00126362', '005490': '00155319', '105560': '00688996',
+  '055550': '00382199', '068270': '00413046', '207940': '00877059', '373220': '01515323', '012330': '00164788',
+};
+const fs = require('fs');
+const CORP_CACHE = '/tmp/dart-corpmap.json';
 async function dartCorpCode(stockCode) {
   const key = process.env.DART_API_KEY;
   if (!key) throw new Error('DART_API_KEY 미설정');
+  if (corpMap && corpMap.has(stockCode)) return corpMap.get(stockCode);
+  if (KNOWN_CORP[stockCode]) {
+    try {
+      const j = await dartGet('company.json', { corp_code: KNOWN_CORP[stockCode] });
+      if (j.status === '000' && String(j.stock_code || '').trim() === stockCode) return { corp_code: KNOWN_CORP[stockCode], corp_name: j.corp_name };
+    } catch (e) { /* 전체 목록으로 */ }
+  }
   if (!corpMap) {
-    const r = await fetchWithTimeout(`${DART}/corpCode.xml?crtfc_key=${key}`, {}, 15000);
+    try { corpMap = new Map(JSON.parse(fs.readFileSync(CORP_CACHE, 'utf8'))); } catch (e) { corpMap = null; }
+  }
+  if (!corpMap) {
+    let r;
+    for (let i = 0; i < 2 && !r; i++) {
+      try { r = await fetchWithTimeout(`${DART}/corpCode.xml?crtfc_key=${key}`, {}, 25000); }
+      catch (e) { if (i === 1) throw new Error(`DART 기업코드 목록을 받지 못했습니다 (${e.message})`); }
+    }
     if (!r.ok) throw new Error(`DART 기업코드 ${r.status}`);
     const buf = Buffer.from(await r.arrayBuffer());
     if (buf.readUInt32LE(0) !== 0x04034b50) throw new Error(`DART 기업코드 응답 오류: ${buf.toString('utf8', 0, 200)}`);
@@ -184,6 +207,7 @@ async function dartCorpCode(stockCode) {
     const re = /<list>\s*<corp_code>(\d+)<\/corp_code>\s*<corp_name>([^<]*)<\/corp_name>(?:\s*<corp_eng_name>[^<]*<\/corp_eng_name>)?\s*<stock_code>\s*(\d{6})\s*<\/stock_code>/g;
     let m;
     while ((m = re.exec(xml))) corpMap.set(m[3], { corp_code: m[1], corp_name: m[2] });
+    try { fs.writeFileSync(CORP_CACHE, JSON.stringify([...corpMap])); } catch (e) { /* 캐시 실패는 무시 */ }
   }
   return corpMap.get(stockCode) || null;
 }
@@ -298,6 +322,15 @@ async function secFinancials(cik) {
   if (!rev && !o && !n) return null;
   return { annual: { year: (rev || o || n).year, rev: rev && rev.val, revPrev: rev && rev.prev, op: o && o.val, opPrev: o && o.prev, ni: n && n.val, niPrev: n && n.prev, equity }, shares };
 }
+// SEC 공시 종류를 한국어로 (8-K는 항목 번호로 무슨 일인지)
+const SEC_FORM = { '10-Q': '분기보고서', '10-K': '연간보고서', '8-K': '수시공시', '6-K': '해외기업 수시공시', '20-F': '해외기업 연간보고서', 'DEF 14A': '주총 안건', 'S-1': '상장 신고서' };
+const SEC_ITEM = { '1.01': '주요 계약', '2.01': '인수·매각 완료', '2.02': '실적 발표', '2.03': '차입', '3.02': '주식 발행', '5.02': '임원 변동', '5.03': '정관 변경', '5.07': '주총 결과', '7.01': '공정공시', '8.01': '기타 주요사항' };
+function secTitle(form, items, desc) {
+  const base = SEC_FORM[form] || (form.startsWith('424B') ? '증권 발행 설명서' : '');
+  const its = String(items || '').split(',').map((x) => SEC_ITEM[x.trim()]).filter(Boolean);
+  const extra = its.length ? its.join('·') : desc && desc !== form ? desc : '';
+  return `${form}${base ? ` ${base}` : ''}${extra ? ` · ${extra}` : ''}`;
+}
 async function secFilings(cik) {
   const r = await fetchWithTimeout(`https://data.sec.gov/submissions/CIK${cik}.json`, { headers: secHeaders() }, 8000);
   if (!r.ok) return [];
@@ -310,7 +343,7 @@ async function secFilings(cik) {
     if (f.filingDate[i] < since) break;
     if (!/^(8-K|10-Q|10-K|6-K|20-F|DEF 14A|S-1|424B)/.test(f.form[i])) continue;
     const acc = f.accessionNumber[i].replace(/-/g, '');
-    out.push({ date: f.filingDate[i], title: `${f.form[i]}${f.primaryDocDescription[i] ? ` · ${f.primaryDocDescription[i]}` : ''}`, link: `https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${acc}/${f.primaryDocument[i]}` });
+    out.push({ date: f.filingDate[i], title: secTitle(f.form[i], f.items && f.items[i], f.primaryDocDescription[i]), link: `https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${acc}/${f.primaryDocument[i]}` });
   }
   return out;
 }

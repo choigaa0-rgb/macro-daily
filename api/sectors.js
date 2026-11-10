@@ -37,7 +37,12 @@ async function usSectors() {
   if (!ok.length) return { ok: false, error: 'Yahoo Finance에서 섹터 ETF를 받지 못했습니다', rows: [] };
   const date = ok.map((r) => r.date).sort().pop();
   const weekBase = (ok.find((r) => r.date === date) || {}).weekBase;
-  return { ok: true, source: 'Yahoo Finance · SPDR 섹터 ETF', date, weekBase, rows: ok, failed: rows.filter((r) => r.error).map((r) => r.etf) };
+  // 미국 장이 열려 있는 동안(뉴욕 9:30~16:00) 마지막 값은 종가가 아니라 장중 가격
+  const et = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+  const g = (t) => (et.find((x) => x.type === t) || {}).value;
+  const etDate = `${g('year')}-${g('month')}-${g('day')}`, etMin = Number(g('hour')) * 60 + Number(g('minute'));
+  const live = date === etDate && etMin >= 570 && etMin < 960;
+  return { ok: true, source: 'Yahoo Finance · SPDR 섹터 ETF', date, weekBase, live, rows: ok, failed: rows.filter((r) => r.error).map((r) => r.etf) };
 }
 
 // ---------- 한국: KRX Open API ----------

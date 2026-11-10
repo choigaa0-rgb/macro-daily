@@ -198,9 +198,9 @@
       ? `<p class="muted small">한국 업종 등락은 KRX Open API 키가 있어야 자동으로 나옵니다. <b>openapi.krx.co.kr</b>에서 인증키를 받고 '코스피 시리즈 일별시세정보' 이용 신청을 한 뒤, Vercel 환경변수 <code>KRX_API_KEY</code>에 넣으세요. 그 전에는 ${link}에서 직접 확인하세요.</p>`
       : `<p class="err small">${esc(S0.error || '불러오지 못했습니다')}</p>`;
     else body = sectorBars(S0.rows, key, kind === 'us' ? (r) => r.ko : (r) => r.name);
-    const meta = S0 && S0.ok ? `${esc(S0.date || '')}${S0.date ? `(${'일월화수목금토'[new Date(S0.date + 'T00:00:00Z').getUTCDay()]})` : ''} 종가${key === 'w1' && S0.weekBase ? ` · ${esc(S0.weekBase)} 종가 대비 5거래일` : ''}` : '';
+    const meta = S0 && S0.ok ? `${esc(S0.date || '')}${S0.date ? `(${'일월화수목금토'[new Date(S0.date + 'T00:00:00Z').getUTCDay()]})` : ''} ${S0.live ? '장중' : '종가'}${key === 'w1' && S0.weekBase ? ` · ${esc(S0.weekBase)} 종가 대비 5거래일` : ''}` : '';
     return `<div class="sec-panel"><div class="sp-head"><b>${title}</b><span class="muted small">${meta}</span></div>${body}
-      <div class="sp-foot muted small">${S0 && S0.ok ? esc(S0.source) + ' · ' : ''}원자료 ${link}${kind === 'us' ? '<br>정규장 종가 기준이에요. Finviz는 미국 장 전·장중에 오늘 실시간 등락을 보여주고, 섹터 안 모든 종목으로 계산해서 숫자가 다를 수 있어요.' : ''}</div></div>`;
+      <div class="sp-foot muted small">${S0 && S0.ok ? esc(S0.source) + ' · ' : ''}원자료 ${link}${kind === 'us' ? '<br>미국 장이 열려 있으면 장중 가격, 닫혀 있으면 종가 기준이에요. Finviz는 장 전에도 실시간 등락을 보여주고 섹터 안 모든 종목으로 계산해서 숫자가 조금 다를 수 있어요.' : ''}</div></div>`;
   }
   function renderSectors() {
     const box = $('#sectorBox');
@@ -1048,14 +1048,14 @@
     const out = [];
     if (it.region !== '국내' && it.sector && S0.us && S0.us.ok) {
       const r = S0.us.rows.find((x) => x.ko === it.sector);
-      if (r && r.d1 != null) out.push(['미국 ' + r.ko, r.d1, S0.us.date]);
+      if (r && r.d1 != null) out.push(['미국 ' + r.ko, r.d1, S0.us.date, S0.us.live]);
     }
     if (it.region !== '해외' && it.kospi_sector && S0.kr && S0.kr.ok) {
       const r = S0.kr.rows.find((x) => nm(x.name) === nm(it.kospi_sector));
       if (r && r.d1 != null) out.push(['코스피 ' + r.name, r.d1, S0.kr.date]);
     }
     const md = (d) => (d ? `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}` : '');
-    return out.map(([l, v, d]) => `<span class="mv-tag ${v > 0 ? 'up' : v < 0 ? 'down' : ''}" title="${esc(d || '')} 종가 기준 섹터 등락. 뉴스보다 앞선 날일 수 있어요">${esc(l)} ${md(d)} ${signed(v, 2, '%')}</span>`).join('');
+    return out.map(([l, v, d, live]) => `<span class="mv-tag ${v > 0 ? 'up' : v < 0 ? 'down' : ''}" title="${live ? `${esc(d || '')} 미국 장중 가격 기준 (아직 종가 아님)` : `${esc(d || '')} 종가 기준. 뉴스보다 앞선 날일 수 있어요`}">${esc(l)} ${md(d)}${live ? ' 장중' : ''} ${signed(v, 2, '%')}</span>`).join('');
   }
   function renderIndustry() {
     const box = $('#industryPanel');
