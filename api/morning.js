@@ -106,7 +106,7 @@ function mailHtml({ date, sig, groups, D, chief, aiError, link }) {
         ${(D.risk.checkpoints || []).length ? `<p style="margin:4px 0"><b>다음 확인</b> ${D.risk.checkpoints.map(esc).join(' · ')}</p>` : ''}` : ''}`
       : `<p style="color:#b23a30">AI 토론을 만들지 못했습니다: ${esc(aiError || '')}<br>대시보드의 AI 리서치센터에서 직접 시작할 수 있어요.</p>`}
     ${sig.sectors ? `<h3 style="margin:16px 0 6px">섹터 연결 (규칙 기반)</h3><p style="margin:4px 0;font-size:13px">${esc(S.sectorText(sig.sectors)).replace(/\n/g, '<br>')}</p>` : ''}
-    <p style="margin:20px 0"><a href="${esc(link)}" style="background:#16202e;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:700">대시보드에서 센터장 결론 쓰기 →</a></p>
+    <p style="margin:20px 0"><a href="${esc(link)}" style="background:#00462a;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:700">대시보드에서 토론 전체 보기</a></p>
   </div>`;
 }
 

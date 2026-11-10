@@ -133,7 +133,7 @@ function morningRunNow() {
     (macro.ok ? macro.mailHtml : fail('매크로 브리핑', macro)) +
     (industry.ok ? industry.mailHtml : fail('산업 이슈', industry)) +
     (company.ok ? company.mailHtml : fail('오늘의 기업', company)) +
-    '<p style="margin:20px 0"><a href="' + base + '/" style="background:#16202e;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:700">대시보드에서 전체 보기 →</a></p>' +
+    '<p style="margin:20px 0"><a href="' + base + '/" style="background:#00462a;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:700">대시보드에서 전체 보기</a></p>' +
     '<p style="font-size:11.5px;color:#888">자동 생성 · AI 분석은 틀릴 수 있습니다 · 투자 권유가 아닌 학습용</p></div>';
   try { buildOverview_(); } catch (e) { console.log('한눈에 정리 실패: ' + e); }
   const tail = [macro.ok && macro.subjectTail, company.ok && company.result && company.result.data && ('오늘의 기업 ' + company.result.data.company.name)].filter(Boolean).join(' · ');

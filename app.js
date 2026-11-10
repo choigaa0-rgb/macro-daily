@@ -168,7 +168,7 @@
   }
 
   // ---------- 매일 점검 ----------
-  // ---------- 섹터 등락 (매일 점검 03 주식) ----------
+  // ---------- 섹터 등락 (시장 데이터 03 주식) ----------
   async function loadSectors() {
     state.sectorBusy = true; renderSectors();
     try { state.sectors = await api('/api/sectors' + (settings().mock ? '?mock=1' : '')); }
@@ -522,11 +522,11 @@
     $('#g8').innerHTML = `
       <p>지금 정보로 <b>5거래일 뒤</b> 각 지표가 오를지, 내릴지, 비슷할지 고릅니다. 모르면 "전망 안 함"으로 두세요.</p>
       <table class="g-table">
-        <tr><th>채점</th><td>점검일 <b>직전 거래일 종가</b> → 그로부터 <b>5거래일 뒤 종가</b> 변화로 자동 채점 (기록 탭)</td></tr>
+        <tr><th>채점</th><td>점검일 <b>직전 거래일 종가</b> → 그로부터 <b>5거래일 뒤 종가</b> 변화로 자동 채점 ('기록과 적중률' 메뉴)</td></tr>
         <tr><th>보합</th><td>${S.FORECASTS.map((f) => `${esc(f.label)} ${esc(f.unitText)}`).join(' · ')} 안이면 보합</td></tr>
       </table>
       ${items ? `<p class="muted">참고: 지난 5거래일 변화 — ${S.FORECASTS.map((f) => { const x = items[f.id]; return x && x.ok && x.chg5 != null ? `${esc(f.label)} ${signed(x.chg5, x.chgUnit === 'bp' ? 1 : 2, x.chgUnit === 'bp' ? 'bp' : '%')}` : null; }).filter(Boolean).join(' · ')}</p>` : ''}
-      ${mine && mine.all.total ? `<p>내 적중률: <b>${pct(mine.all)}</b> (${mine.all.hit}/${mine.all.total}) ${S.FORECASTS.map((f) => mine.byAsset[f.key].total ? `· ${esc(f.label)} ${pct(mine.byAsset[f.key])}` : '').join(' ')}</p>` : '<p class="muted">기록 탭에서 불러오기를 하면 내 적중률이 여기 보입니다.</p>'}
+      ${mine && mine.all.total ? `<p>내 적중률: <b>${pct(mine.all)}</b> (${mine.all.hit}/${mine.all.total}) ${S.FORECASTS.map((f) => mine.byAsset[f.key].total ? `· ${esc(f.label)} ${pct(mine.byAsset[f.key])}` : '').join(' ')}</p>` : '<p class="muted">\'기록과 적중률\' 메뉴를 한 번 열면 내 적중률이 여기 보입니다.</p>'}
       <p>근거는 ①~④에서 쓴 이야기와 이어지게 씁니다. 예: "물가 이야기 → 금리 상승·원화 약세".</p>`;
 
     // ⑧ 투자 시사점
@@ -1317,7 +1317,7 @@
         </div>
         <div id="eventChecklist"></div>
         <label class="fld wide"><span>해석 메모</span><textarea data-key="이벤트_해석" rows="4" placeholder="기대와 결과의 괴리가 정책 기대를 어떻게 바꿨나? 처음 반응이 뒤집혔다면 시장이 무엇을 다시 해석했나?"></textarea></label>
-        <p class="hint">저장은 <b>매일 점검</b> 탭의 '구글 시트에 저장' 버튼으로 함께 됩니다.</p>
+        <p class="hint">저장은 <b>오늘의 브리핑</b>의 '오늘 브리핑 시트에 저장' 버튼으로 함께 됩니다.</p>
       </div>`;
     renderEventChecklist();
   }
@@ -1362,7 +1362,7 @@
         <div class="col-main">
           <div class="card">
             <h2>이번 주 데일리 기록</h2>
-            <div id="weekDailyList"><span class="muted">기록 탭에서 시트를 연결하면 이번 주 결론들이 여기에 모입니다.</span></div>
+            <div id="weekDailyList"><span class="muted">'기록과 적중률' 메뉴를 한 번 열면 이번 주 기록이 여기에 모입니다.</span></div>
           </div>
           <div class="card">
             <h2>글로벌 10년물</h2>
