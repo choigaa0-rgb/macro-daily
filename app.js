@@ -1411,15 +1411,13 @@
   function renderRecordsShell() {
     const url = settings().sheetUrl;
     $('#recordsPanel').innerHTML = `
-      <div class="card" id="scoreCard">
-        <div class="wk-head"><h2>전망 적중 기록</h2><span class="hint">5거래일 뒤 방향 · 자동 채점</span></div>
-        <div id="scoreBody"><span class="muted">아래 '불러오기'를 누르면 저장된 전망을 실제 데이터로 채점합니다.</span></div>
-      </div>
-      <div class="card">
-        <div class="wk-head"><h2>저장된 데일리 기록</h2>
-          <div class="rec-actions">${url ? `<a class="btn ghost" href="${esc(url)}" target="_blank" rel="noopener">시트 열기</a>` : ''}<button class="btn" id="loadRecords">불러오기</button></div></div>
-        <div id="recordsTable"><span class="muted">'불러오기'를 누르면 구글 시트의 기록을 가져옵니다.</span></div>
-      </div>`;
+      <header class="page-head">
+        <div><div class="ph-kicker">기록과 적중률</div><h1 class="ph-title">AI 전망, 얼마나 맞았나</h1>
+          <div class="ph-meta">매일 아침 AI 센터장·BULL·BEAR가 낸 5거래일 뒤 방향을 실제 결과로 자동 채점해요.</div></div>
+        <div class="rec-actions">${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener">구글 시트 열기</a>` : ''}<button class="btn primary" id="loadRecords" type="button">다시 불러오기</button></div>
+      </header>
+      <div id="scoreBody"><div class="card"><span class="muted">기록을 불러오는 중…</span></div></div>
+      <div class="card"><h2>저장된 기록 <span class="muted">눌러서 그날 결론 보기</span></h2><div id="recordsTable"><span class="muted">불러오는 중…</span></div></div>`;
   }
   async function loadRecords() {
     const box = $('#recordsTable');
@@ -1434,9 +1432,12 @@
       state.weeklyRecords = wk.rows || [];
       renderScores();
       if (!state.records.length) { box.innerHTML = '<span class="muted">아직 저장된 기록이 없습니다.</span>'; return; }
-      box.innerHTML = `<table class="rec"><thead><tr><th>날짜</th><th>방식</th><th>오늘의 동인</th><th>이야기</th><th>국면</th><th>뷰</th></tr></thead><tbody>${state.records.map((r, i) => `
-        <tr data-i="${i}"><td class="mono">${esc(r['날짜'])}</td><td>${esc(r['작성 방식'] || '직접')}</td><td>${esc(r['오늘의 동인'])}</td><td>${esc(r['이야기'])}</td><td>${esc(r['국면 판단'])}</td><td>${esc(r['뷰 변화'])}</td></tr>
-        <tr class="rec-detail" hidden><td colspan="6"><div class="rec-body">${esc(r['종합 해석'] || '(종합 해석 없음)')}</div></td></tr>`).join('')}</tbody></table>`;
+      box.innerHTML = `<table class="rec rec-list"><thead><tr><th>날짜</th><th>한 줄 요약</th><th>국면</th><th>AI 전망</th><th>내 결론</th></tr></thead><tbody>${state.records.map((r, i) => {
+        const fc = S.FORECASTS.map((f) => { const v = r[f.key.replace('전망_', 'AI전망_')]; return v ? `<span class="fc-mini ${v === '상승' ? 'up' : v === '하락' ? 'down' : ''}">${esc(f.label.replace('미국 ', ''))} ${v === '상승' ? '▲' : v === '하락' ? '▼' : '–'}</span>` : ''; }).join('');
+        const mine = r['종합 해석'] && !/^AI/.test(r['작성 방식'] || '') ? '작성' : r['종합 해석'] ? 'AI 결론 수정' : '';
+        return `<tr data-i="${i}" class="rec-row"><td class="mono">${esc(r['날짜'])}</td><td>${esc(r['한 줄 요약'] || (r['AI 종합 해석'] || '').slice(0, 60))}</td><td>${esc(r['국면 판단'] || r['자동_국면 신호'] || '')}</td><td class="fc-cell-mini">${fc || '<span class="muted">–</span>'}</td><td>${mine ? `<span class="badge good">${mine}</span>` : '<span class="muted">–</span>'}</td></tr>
+        <tr class="rec-detail" hidden><td colspan="5"><div class="rec-body"><b>AI 센터장</b> ${esc(r['AI 종합 해석'] || '(없음)')}${r['종합 해석'] ? `<br><br><b>내 결론</b> ${esc(r['종합 해석'])}` : ''}</div></td></tr>`;
+      }).join('')}</tbody></table>`;
       renderWeekDaily();
       renderGuides();
     } catch (e) {
@@ -1458,41 +1459,39 @@
   function renderScores() {
     const box = $('#scoreBody');
     if (!box) return;
-    if (!state.records || !state.market) { box.innerHTML = '<span class="muted">기록과 시장 데이터를 불러오면 채점합니다.</span>'; return; }
-    const scored = S.scoreRecords(state.records, state.market.items);
-    state.scored = scored;
-    const { sum, rows } = scored;
+    if (!state.records || !state.market) { box.innerHTML = '<div class="card"><span class="muted">기록과 시장 데이터를 불러오면 채점합니다.</span></div>'; return; }
+    state.scored = S.scoreRecords(state.records, state.market.items);
     const actors = S.scoreActors(state.records, state.market.items);
     state.actorScores = actors;
     setTimeout(renderCross, 0);
-    const withFc = rows.filter((r) => S.FORECASTS.some((f) => r.res[f.key].status !== '없음'));
-    const mark = (x) => x.status === '채점'
-      ? `<span class="${x.hit ? 'hit' : 'miss'}">${x.hit ? '✓' : '✗'}</span> <span class="muted">${esc(x.call)}→${esc(x.actual)}</span>`
-      : x.status === '대기' ? `<span class="muted">대기 ${x.remaining}일</span>` : x.status === '없음' ? '<span class="muted">–</span>' : `<span class="muted">${esc(x.status)}</span>`;
-    const vw = { 맞음: 0, '부분적으로 맞음': 0, 틀림: 0 };
-    (state.weeklyRecords || []).forEach((w) => { if (vw[w['뷰 검증']] != null) vw[w['뷰 검증']]++; });
-    const vwTotal = vw['맞음'] + vw['부분적으로 맞음'] + vw['틀림'];
-    box.innerHTML = withFc.length ? `
-      <div class="score-top">
-        <div class="score-big"><div class="sb-num">${pct(sum.all)}</div><div class="muted">전체 적중률 · ${sum.all.hit}/${sum.all.total}${sum.pending ? ` · 채점 대기 ${sum.pending}` : ''}</div></div>
-        <table class="g-table score-tbl">
-          <tr><th>지표</th>${S.FORECASTS.map((f) => `<th>${esc(f.label)}</th>`).join('')}</tr>
-          <tr><th>적중률</th>${S.FORECASTS.map((f) => `<td>${pct(sum.byAsset[f.key])} <span class="muted">(${sum.byAsset[f.key].hit}/${sum.byAsset[f.key].total})</span></td>`).join('')}</tr>
-        </table>
-        ${S.ACTORS.some((a) => actors.byActor[a.name].total) ? `<table class="g-table score-tbl">
-          <tr><th>출처별</th>${S.ACTORS.map((a) => `<th>${esc(a.label)}</th>`).join('')}</tr>
-          <tr><th>적중률</th>${S.ACTORS.map((a) => `<td>${pct(actors.byActor[a.name])} <span class="muted">(${actors.byActor[a.name].hit}/${actors.byActor[a.name].total})</span></td>`).join('')}</tr>
-        </table>` : ''}
-        <table class="g-table score-tbl">
-          <tr><th>작성 방식</th><th>직접</th><th>AI 작성 (브리핑·센터장)</th><th>주간 뷰 자기평가</th></tr>
-          <tr><th>적중률</th><td>${pct(sum.byMode['직접'])} <span class="muted">(${(sum.byMode['직접'] || { total: 0 }).total}건)</span></td><td>${pct(sum.byMode['AI 작성'])} <span class="muted">(${(sum.byMode['AI 작성'] || { total: 0 }).total}건)</span></td>
-            <td>${vwTotal ? `맞음 ${vw['맞음']} · 부분 ${vw['부분적으로 맞음']} · 틀림 ${vw['틀림']}` : '<span class="muted">주간 기록 없음</span>'}</td></tr>
-        </table>
-      </div>
-      <table class="rec score-list"><thead><tr><th>날짜</th><th>방식</th>${S.FORECASTS.map((f) => `<th>${esc(f.label)}</th>`).join('')}</tr></thead>
-        <tbody>${withFc.slice(0, 30).map((r) => `<tr><td class="mono">${esc(r.date)}</td><td>${esc(r.mode)}</td>${S.FORECASTS.map((f) => `<td>${mark(r.res[f.key])}</td>`).join('')}</tr>`).join('')}</tbody></table>
-      <p class="muted">기준: 점검일 직전 거래일 종가 → 5거래일 뒤 종가. 약 6개월보다 오래된 기록은 '기간 지남'으로 표시됩니다.</p>`
-      : '<span class="muted">아직 전망을 기록한 날이 없습니다. 오늘의 결론 ⑦에서 전망을 고르고 저장하세요.</span>';
+    const items = state.market.items;
+    const one = (r, f, prefix) => S.scoreOne(items[f.id] && items[f.id].pts, r['날짜'], r[f.key.replace('전망_', prefix)], f);
+    // 출처별 × 지표별 적중
+    const grid = {};
+    S.ACTORS.forEach((a) => { grid[a.name] = {}; S.FORECASTS.forEach((f) => { const t = { hit: 0, total: 0 }; state.records.forEach((r) => { const x = one(r, f, a.prefix); if (x.status === '채점') { t.total++; if (x.hit) t.hit++; } }); grid[a.name][f.key] = t; }); });
+    const shown = S.ACTORS.filter((a) => actors.byActor[a.name].total || actors.byActor[a.name].pending);
+    const anyScored = shown.some((a) => actors.byActor[a.name].total);
+    const best = anyScored ? shown.slice().sort((x, y) => (actors.byActor[y.name].hit / (actors.byActor[y.name].total || 1)) - (actors.byActor[x.name].hit / (actors.byActor[x.name].total || 1)))[0] : null;
+    const rows = state.records.filter((r) => S.FORECASTS.some((f) => r[f.key.replace('전망_', 'AI전망_')])).slice(0, 30);
+    const mark = (x, call) => {
+      if (!call) return '<span class="muted">–</span>';
+      const arrow = call === '상승' ? '▲' : call === '하락' ? '▼' : '–';
+      if (x.status === '채점') return `<span class="sc ${x.hit ? 'hit' : 'miss'}" title="전망 ${esc(call)} → 실제 ${esc(x.actual)}">${arrow} ${x.hit ? '적중' : '빗나감'}</span>`;
+      if (x.status === '대기') return `<span class="sc wait" title="${x.remaining}거래일 뒤 채점">${arrow} 대기 ${x.remaining}일</span>`;
+      return `<span class="muted">${arrow} ${esc(x.status)}</span>`;
+    };
+    box.innerHTML = !shown.length ? `<div class="card"><p class="muted">아직 채점할 전망이 없어요. 아침 자동 브리핑이 쌓이면 여기에 적중률이 나와요.</p></div>` : `
+      <div class="actor-grid">${shown.map((a) => { const t = actors.byActor[a.name]; return `<div class="actor ${best && best.name === a.name ? 'best' : ''}">
+        <div class="ac-l">${esc(a.label)}${best && best.name === a.name ? ' <span class="badge good">가장 정확</span>' : ''}</div>
+        <div class="ac-v">${t.total ? pct(t) : '–'}</div>
+        <div class="ac-s">${t.total ? `${t.hit}/${t.total} 적중 · ${t.days}일` : '아직 채점 전'}${t.pending ? ` · 대기 ${t.pending}` : ''}</div>
+        <div class="ac-bars">${S.FORECASTS.map((f) => { const g = grid[a.name][f.key]; const w = g.total ? Math.round((g.hit / g.total) * 100) : 0; return `<div class="ac-bar"><span>${esc(f.label.replace('미국 ', ''))}</span><i><b style="width:${w}%"></b></i><em>${g.total ? `${w}%` : '–'}</em></div>`; }).join('')}</div>
+      </div>`; }).join('')}</div>
+      ${!anyScored ? '<p class="muted small pending-note">전망은 5거래일이 지나야 채점돼요. 첫 결과는 다음 주에 나와요.</p>' : ''}
+      <div class="card"><h2>날짜별 AI 센터장 전망과 결과 <span class="muted">5거래일 뒤 방향 · 보합 기준 ${S.FORECASTS.map((f) => `${esc(f.label.replace('미국 ', ''))} ${esc(f.unitText)}`).join(' · ')}</span></h2>
+        <table class="rec score-list"><thead><tr><th>날짜</th>${S.FORECASTS.map((f) => `<th>${esc(f.label)}</th>`).join('')}</tr></thead>
+        <tbody>${rows.map((r) => `<tr><td class="mono">${esc(r['날짜'])}</td>${S.FORECASTS.map((f) => { const c = r[f.key.replace('전망_', 'AI전망_')]; return `<td>${mark(one(r, f, 'AI전망_'), c)}</td>`; }).join('')}</tr>`).join('')}</tbody></table>
+        <p class="muted small">기준: 기록한 날 직전 거래일 종가 → 5거래일 뒤 종가. 약 6개월보다 오래된 기록은 '기간 지남'으로 표시돼요.</p></div>`;
     renderGuides();
   }
   function renderWeekDaily() {
