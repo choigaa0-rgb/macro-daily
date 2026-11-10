@@ -304,7 +304,16 @@ async function brokerReports(stockCode) {
   const buf = Buffer.from(await r.arrayBuffer());
   let html;
   try { html = new TextDecoder('euc-kr').decode(buf); } catch (e) { html = buf.toString('utf8'); }
-  return parseNaverReports(html);
+  const list = parseNaverReports(html);
+  if (!list.length) {
+    // 진단: 목록을 하나도 못 읽으면 원인을 짐작할 수 있게 페이지 모양을 알려줌
+    const links = (html.match(/company_read\.naver/g) || []).length;
+    const dates = html.match(/\d{2}\.\d{2}\.\d{2}/g) || [];
+    const title = ((html.match(/<title>([^<]*)<\/title>/i) || [])[1] || '').trim().slice(0, 40);
+    if (links === 0 || !dates.length) throw new Error(`목록을 읽지 못함 (페이지 ${Math.round(html.length / 1024)}KB, 리포트 링크 ${links}개, 날짜 ${dates.length}개, 제목 "${title}")`);
+    throw new Error(`최근 60일 리포트 없음으로 판단 (리포트 링크 ${links}개, 가장 최근 날짜 ${dates[0]})`);
+  }
+  return list;
 }
 async function dartCompany(corp) {
   const j = await dartGet('company.json', { corp_code: corp });
