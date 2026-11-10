@@ -1662,7 +1662,7 @@
         const it = state.market.items[id];
         const def = C.indicators[id];
         if (!def) return;
-        rec[`${def.label}`] = it && it.ok ? it.value : '';
+        rec[`${def.label}`] = it && it.ok ? Number(Number(it.value).toFixed(def.digits != null ? def.digits : 2)) : '';
         rec[`${def.label} 변화(${(it && it.chgUnit) || '%'})`] = it && it.ok && it.chg != null ? it.chg : '';
       });
       rec['데이터 기준'] = state.market.mock ? '목업' : '자동수집';
@@ -1703,6 +1703,7 @@
     rec['교차검증_데이터'] = vv && vv.list.length ? `일치 ${vv.ok} · 불일치 ${vv.bad}${vv.bad ? ` (${vv.list.filter((x) => x.status === '불일치').map((x) => x.text).join(', ')})` : ''}` : '';
     rec['교차검증_리포트 일치도'] = state.cmpMatch || '';
     const D = state.debate || {};
+    rec['한 줄 요약'] = D.headline || '';
     rec['AI 토론'] = debateSummaryText(D);
     rec['리스크팀 판단'] = D.risk ? D.risk.balance || '' : '';
     S.FORECASTS.forEach((f) => {
