@@ -865,11 +865,11 @@
     $('#briefPanel').innerHTML = `
       <div id="briefBody"></div>
       <div class="card" id="crossCard">
-        <h2>교차검증</h2>
-        <p class="hint">AI 분석은 틀릴 수 있습니다. 세 가지로 확인해서 결론의 정확도를 높입니다.</p>
-        <div id="crossAuto"></div>
-        <div class="report-block cross-report">
-          <h3>② 증권사 리포트와 대조</h3>
+        <h2>교차검증 <span class="muted">AI 분석이 맞는지 세 가지로 확인</span></h2>
+        <div class="x-sum" id="crossSum"></div>
+        <details class="x-det" id="xData"><summary><b>① 데이터 대조</b><span class="muted">AI 문장 속 숫자를 실제 데이터와 비교 (자동)</span></summary><div id="crossAuto"></div></details>
+        <details class="x-det" id="xReport"><summary><b>② 증권사 리포트 대조</b><span class="muted">오늘 시황 리포트 PDF를 올려 AI 결론과 비교</span></summary>
+          <div class="report-block cross-report">
           <ol class="steps">
             <li><a href="https://consensus.hankyung.com/analysis/list?skinType=market" target="_blank" rel="noopener">한경컨센서스 시장 리포트</a>에서 오늘 날짜의 데일리·시황 리포트를 하나 고릅니다.</li>
             <li>PDF를 올리거나 핵심 부분을 붙여넣고 <b>AI로 교차검증</b>을 누르면, 오늘의 결론과 일치도·다른 점·숫자 차이·보완 제안을 정리합니다.</li>
@@ -882,7 +882,9 @@
           <div class="ai-out" id="cmpOut"><span class="muted">리포트를 올리고 교차검증을 누르세요.</span></div>
           <label class="fld wide"><span>교차검증 메모</span><textarea data-key="리포트 비교 메모" rows="2" placeholder="받아들일 점 / 고칠 점"></textarea></label>
         </div>
-        <div id="crossScore"></div>
+        </details>
+        <details class="x-det" id="xScore"><summary><b>③ 사후 채점</b><span class="muted">출처별 5거래일 전망 적중률</span></summary>
+        <div id="crossScore"></div></details>
         <button class="btn primary block" id="saveBrief" type="button">오늘 브리핑 시트에 저장</button>
         <div class="save-note" id="saveNoteBrief">AI 결론·전망·교차검증 결과가 그날 기록에 함께 저장돼 나중에 적중률이 채점됩니다.</div>
       </div>`;
@@ -999,8 +1001,7 @@
     const box = $('#crossAuto');
     if (!box) return;
     const v = state.aiConcl || (state.debate && state.debate.open) ? verifyNow() : null;
-    box.innerHTML = `<h3>① 데이터 대조 <span class="muted">AI 문장 속 숫자 ↔ 실제 데이터 (자동)</span></h3>
-      ${!v ? '<p class="muted">AI 브리핑이 나오면 자동으로 대조합니다.</p>' : !v.list.length ? '<p class="muted">대조할 숫자를 찾지 못했습니다.</p>' : `
+    box.innerHTML = `${!v ? '<p class="muted">AI 브리핑이 나오면 자동으로 대조합니다.</p>' : !v.list.length ? '<p class="muted">대조할 숫자를 찾지 못했습니다.</p>' : `
         <p><span class="badge ${v.bad ? 'bad' : 'good'}">${v.bad ? `불일치 ${v.bad}건` : '모두 일치'}</span> 숫자 ${v.list.length}개 중 일치 ${v.ok} · 불일치 ${v.bad}${v.na ? ` · 확인 불가 ${v.na}` : ''}</p>
         ${v.bad ? `<table class="g-table">${v.list.filter((x) => x.status === '불일치').map((x) => `<tr><th class="miss">✗</th><td>AI: ${esc(x.text)}</td><td>실제: ${esc(x.actual || '-')}</td></tr>`).join('')}</table>` : ''}
         <details class="qs"><summary>대조한 숫자 전체</summary><table class="g-table">${v.list.map((x) => `<tr><th class="${x.status === '일치' ? 'hit' : x.status === '불일치' ? 'miss' : 'muted'}">${x.status === '일치' ? '✓' : x.status === '불일치' ? '✗' : '?'}</th><td>${esc(x.text)}</td><td>${esc(x.actual || x.status)}</td></tr>`).join('')}</table></details>`}`;
@@ -1008,12 +1009,27 @@
     const sc = $('#crossScore');
     if (!sc) return;
     const a = state.scored && state.actorScores;
-    sc.innerHTML = `<h3>③ 사후 채점 <span class="muted">출처별 5거래일 전망 적중률</span></h3>
-      ${a ? `<table class="g-table score-tbl"><tr>${S.ACTORS.map((x) => `<th>${esc(x.label)}</th>`).join('')}</tr>
+    sc.innerHTML = `${a ? `<table class="g-table score-tbl"><tr>${S.ACTORS.map((x) => `<th>${esc(x.label)}</th>`).join('')}</tr>
         <tr>${S.ACTORS.map((x) => `<td>${pct(a.byActor[x.name])} <span class="muted">(${a.byActor[x.name].hit}/${a.byActor[x.name].total}${a.byActor[x.name].pending ? `, 대기 ${a.byActor[x.name].pending}` : ''})</span></td>`).join('')}</tr></table>
         <p class="muted">AI 결론을 얼마나 믿을지 판단하는 근거입니다. 채점이 쌓일수록 정확해집니다.</p>`
         : '<p class="muted"><a href="#" data-act="load-scores">기록 불러와서 적중률 보기</a></p>'}
       ${state.cmpMatch ? `<p>증권사 리포트 일치도: <span class="badge ${state.cmpMatch === '일치' ? 'good' : state.cmpMatch === '불일치' ? 'bad' : 'warn'}">${esc(state.cmpMatch)}</span></p>` : ''}`;
+    renderCrossSum(v, a);
+  }
+  // 교차검증 요약 3칸 (항상 보임). 자세한 내용은 아래 접이식에서
+  function renderCrossSum(v, a) {
+    const box = $('#crossSum');
+    if (!box) return;
+    const tone = (t) => (t === 'good' ? 'good' : t === 'bad' ? 'bad' : t === 'warn' ? 'warn' : '');
+    const d = !v ? ['대기', 'AI 브리핑이 나오면 자동 대조', ''] : !v.list.length ? ['-', '대조할 숫자 없음', ''] : v.bad ? [`불일치 ${v.bad}건`, `숫자 ${v.list.length}개 중 일치 ${v.ok}`, 'bad'] : [`모두 일치`, `숫자 ${v.list.length}개 확인`, 'good'];
+    const m = state.cmpMatch;
+    const r = m ? [m, '오늘 리포트와 비교함', m === '일치' ? 'good' : m === '불일치' ? 'bad' : 'warn'] : ['아직 안 함', 'PDF를 올려 비교하기', ''];
+    const ai = a && a.byActor && a.byActor.AI;
+    const sc = ai && ai.total ? [pct(ai), `AI 전망 ${ai.hit}/${ai.total} 적중${ai.pending ? ` · 대기 ${ai.pending}` : ''}`, ''] : ['-', a ? '채점할 기록이 아직 없음' : '눌러서 적중률 보기', ''];
+    const cell = (no, label, [val, sub, t], target) => `<button type="button" class="x-cell ${tone(t)}" data-act="x-open" data-val="${target}">
+      <span class="x-l">${no} ${label}</span><span class="x-v">${esc(val)}</span><span class="x-s">${esc(sub)}</span></button>`;
+    box.innerHTML = cell('①', '데이터 대조', d, 'xData') + cell('②', '증권사 리포트', r, 'xReport') + cell('③', '사후 적중률 (AI)', sc, 'xScore');
+    if (v && v.bad && !state.xDataAutoOpened) { state.xDataAutoOpened = true; const el = $('#xData'); if (el) el.open = true; }
   }
 
   async function makeBriefNow() {
@@ -1828,6 +1844,7 @@
         if (a === 'goto-conclusion') { gotoTab('daily'); if ($('#myConcl')) $('#myConcl').open = true; setTimeout(() => $('#conclusionPanel').scrollIntoView({ behavior: 'smooth' }), 50); return; }
         if (a === 'goto-center') { e.preventDefault(); gotoTab('center'); return; }
         if (a === 'goto') { e.preventDefault(); gotoTab(act.dataset.val); return; }
+        if (a === 'x-open') { const el = $('#' + act.dataset.val); if (el) { el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } if (act.dataset.val === 'xScore' && !state.scored && $('[data-act="load-scores"]')) $('[data-act="load-scores"]').click(); return; }
         if (a === 'ind-region') { state.indRegion = act.dataset.val; renderIndustry(); return; }
         if (a === 'sec-period') { state.secPeriod = act.dataset.val; renderSectors(); return; }
         if (a === 'sec-fill') { sectorFill(); return; }

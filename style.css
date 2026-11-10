@@ -1121,3 +1121,24 @@ details.my-concl[open] .my-toggle::after { content: '접기'; }
 #view-daily .overview { grid-template-columns: 1fr; }
 details.my-concl[open] > summary { margin-bottom: 12px; }
 .manual-box .check { display: inline-flex; gap: 6px; margin-top: 10px; font-size: 13px; }
+
+/* ===== 교차검증: 요약 3칸 + 접이식 ===== */
+#crossCard h2 { margin-bottom: 12px; }
+.x-sum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.x-cell { text-align: left; font: inherit; color: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 3px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--card-line, var(--line)); background: var(--paper-2); transition: border-color .15s; }
+.x-cell:hover { border-color: var(--accent); }
+.x-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.x-l { font-size: 12.5px; font-weight: 650; color: var(--ink-3); }
+.x-v { font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
+.x-s { font-size: 12.5px; color: var(--ink-3); }
+.x-cell.good .x-v { color: var(--good); } .x-cell.bad .x-v { color: var(--bad); } .x-cell.warn .x-v { color: var(--warn); }
+.x-cell.bad { background: var(--bad-bg); border-color: transparent; }
+details.x-det { border-top: 1px solid var(--line-2); }
+details.x-det > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding: 12px 2px; font-size: 14.5px; }
+details.x-det > summary::-webkit-details-marker { display: none; }
+details.x-det > summary::after { content: '펼치기'; margin-left: auto; font-size: 12.5px; font-weight: 650; color: var(--ink-3); }
+details.x-det[open] > summary::after { content: '접기'; }
+details.x-det > summary .muted { font-size: 12.5px; }
+details.x-det[open] { padding-bottom: 12px; }
+#crossCard #saveBrief { margin-top: 14px; }
+@media (max-width: 640px) { .x-sum { grid-template-columns: 1fr; } .x-cell { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; } .x-s { width: 100%; } }
