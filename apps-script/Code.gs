@@ -26,7 +26,9 @@ function doPost(e) {
       MailApp.sendEmail({ to: body.to, subject: body.subject || 'Macro Daily', htmlBody: body.html || '', name: 'Macro Daily' });
       return json_({ ok: true, mailed: body.to });
     }
-    return json_(upsert_(sheetOf_(body.sheet), body.record || {}));
+    const res = upsert_(sheetOf_(body.sheet), body.record || {});
+    try { buildOverview_(); } catch (e) { res.overviewError = String(e); }
+    return json_(res);
   } catch (err) {
     return json_({ ok: false, error: String(err) });
   }
@@ -55,6 +57,7 @@ function upsert_(sheetName, record) {
       sh.appendRow(row);
       target = sh.getLastRow();
     }
+    formatSheet_(sh);
     return { ok: true, sheet: sheetName, row: target, updated: existed };
   } finally {
     lock.releaseLock();
@@ -132,6 +135,7 @@ function morningRunNow() {
     (company.ok ? company.mailHtml : fail('오늘의 기업', company)) +
     '<p style="margin:20px 0"><a href="' + base + '/" style="background:#16202e;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:700">대시보드에서 전체 보기 →</a></p>' +
     '<p style="font-size:11.5px;color:#888">자동 생성 · AI 분석은 틀릴 수 있습니다 · 투자 권유가 아닌 학습용</p></div>';
+  try { buildOverview_(); } catch (e) { console.log('한눈에 정리 실패: ' + e); }
   const tail = [macro.ok && macro.subjectTail, company.ok && company.result && company.result.data && ('오늘의 기업 ' + company.result.data.company.name)].filter(Boolean).join(' · ');
   MailApp.sendEmail({ to: to, subject: ('[Macro Daily] ' + date.slice(5).replace('-', '/') + ' 아침 브리핑' + (tail ? ' — ' + tail : '')).slice(0, 150), htmlBody: html, name: 'Macro Daily' });
 }
@@ -175,4 +179,100 @@ function clean_(v) {
 
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+
+/**
+ * ===== 보기 좋게 정리 =====
+ * 원본 탭(데일리·자동 브리핑·산업 이슈·기업 분석)은 대시보드가 읽는 '창고'라 열이 많습니다.
+ * 사람이 읽는 탭 '한눈에'를 맨 앞에 만들어, 하루 한 줄로 핵심만 최신순으로 보여 줍니다.
+ * 저장할 때마다 자동으로 다시 만들어지고, 처음 한 번은 함수 '정리하기'를 실행하면 기존 탭까지 정리됩니다.
+ */
+function 정리하기() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  SHEETS.forEach(function (n) { const sh = ss.getSheetByName(n); if (sh && sh.getLastRow() >= 1) formatSheet_(sh); });
+  buildOverview_();
+}
+
+// 원본 탭: 머리줄 색·고정, 줄바꿈 대신 자르기, 열 너비, JSON 열 숨기기
+function formatSheet_(sh) {
+  const lastCol = sh.getLastColumn(), lastRow = Math.max(sh.getLastRow(), 1);
+  if (lastCol < 1) return;
+  const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(String);
+  sh.setFrozenRows(1);
+  sh.setFrozenColumns(Math.min(1, lastCol));
+  sh.getRange(1, 1, 1, lastCol).setFontWeight('bold').setBackground('#00462a').setFontColor('#ffffff').setVerticalAlignment('middle');
+  sh.setRowHeight(1, 30);
+  sh.getRange(1, 1, lastRow, lastCol).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP).setVerticalAlignment('top');
+  headers.forEach(function (h, i) {
+    const col = i + 1;
+    if (/JSON/.test(h)) { sh.hideColumns(col); return; }
+    const long = /요약|해석|주장|결론|쟁점|이유|BULL|BEAR|메모|시사점|발표지표|피드백|비교/.test(h);
+    sh.setColumnWidth(col, h === '날짜' ? 95 : long ? 280 : 110);
+  });
+}
+
+function rowsOf_(name) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+  if (!sh || sh.getLastRow() < 2) return {};
+  const v = sh.getDataRange().getDisplayValues(), h = v[0], out = {};
+  v.slice(1).forEach(function (r) { const o = {}; h.forEach(function (k, i) { o[k] = r[i]; }); if (o['날짜']) out[o['날짜']] = o; });
+  return out;
+}
+function pick_(objs, keys) {
+  for (let i = 0; i < objs.length; i++) {
+    const o = objs[i]; if (!o) continue;
+    for (let j = 0; j < keys.length; j++) if (o[keys[j]]) return o[keys[j]];
+  }
+  return '';
+}
+// 지표 값 + 변화를 한 칸에: 4.88 (+2.0bp)
+function level_(d, label) {
+  if (!d || d[label] === undefined || d[label] === '') return '';
+  const ck = Object.keys(d).filter(function (k) { return k.indexOf(label + ' 변화(') === 0; })[0];
+  const unit = ck ? ck.slice(label.length + 4, -1) : '';
+  const c = ck ? d[ck] : '';
+  return d[label] + (c !== '' && c !== undefined ? ' (' + (Number(c) > 0 ? '+' : '') + c + unit + ')' : '');
+}
+
+function buildOverview_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const daily = rowsOf_('데일리'), auto = rowsOf_('자동 브리핑'), ind = rowsOf_('산업 이슈'), co = rowsOf_('기업 분석');
+  const dates = Object.keys(Object.assign({}, daily, auto, ind, co)).sort().reverse();
+  if (!dates.length) return;
+  const arrow = { 상승: '▲', 하락: '▼', 보합: '–' };
+  const head = ['날짜', '한 줄 요약', '오늘의 결론 (AI 센터장)', '5거래일 전망 (AI)', '국면', '미국 10년물', 'S&P500', '원달러', 'KOSPI', 'VIX', '섹터 시사점', '산업 이슈', '오늘의 기업', '기업 숫자 검증', '브리핑 교차검증', '내 결론'];
+  const rows = dates.map(function (dt) {
+    const d = daily[dt], a = auto[dt], i = ind[dt], c = co[dt];
+    const fc = ['미국10년물', 'S&P500', '원달러', 'KOSPI'].map(function (k) {
+      const v = pick_([d, a], ['AI전망_' + k]); return v ? k.replace('미국10년물', '10년물') + ' ' + (arrow[v] || '') + v : '';
+    }).filter(String).join(' · ');
+    return [dt,
+      pick_([a, d], ['한 줄 요약']),
+      pick_([d, a], ['AI 종합 해석']),
+      fc,
+      pick_([d, a], ['자동_국면 신호', '자동_국면']),
+      level_(d, '미국 10년물'), level_(d, 'S&P500'), level_(d, '원달러'), level_(d, 'KOSPI'), level_(d, 'VIX'),
+      pick_([d, a], ['자동_섹터 시사점']),
+      i ? i['한 줄 요약'] || '' : '',
+      c ? (c['기업'] || '') + (c['한 줄 요약'] ? ' — ' + c['한 줄 요약'] : '') : '',
+      c ? c['숫자 검증'] || '' : '',
+      d ? [d['교차검증_데이터'] ? '데이터 ' + d['교차검증_데이터'] : '', d['교차검증_리포트 일치도'] ? '리포트 일치도 ' + d['교차검증_리포트 일치도'] : ''].filter(String).join(' / ') : '',
+      d && (!/^AI/.test(d['작성 방식'] || '') || /수정/.test(d['작성 방식'])) ? d['종합 해석'] || '' : ''];
+  }).map(function (r) { return r.map(clean_); });
+
+  let sh = ss.getSheetByName('한눈에');
+  if (!sh) sh = ss.insertSheet('한눈에', 0);
+  sh.clear();
+  sh.getRange(1, 1, 1, head.length).setValues([head]);
+  sh.getRange(2, 1, rows.length, head.length).setValues(rows);
+  sh.setFrozenRows(1); sh.setFrozenColumns(2);
+  sh.getRange(1, 1, 1, head.length).setFontWeight('bold').setBackground('#00462a').setFontColor('#ffffff').setVerticalAlignment('middle');
+  sh.setRowHeight(1, 32);
+  const body = sh.getRange(2, 1, rows.length, head.length);
+  body.setVerticalAlignment('top').setWrap(true).setFontSize(10);
+  [95, 260, 380, 230, 110, 110, 110, 110, 110, 90, 260, 260, 260, 110, 200, 260].forEach(function (w, k) { sh.setColumnWidth(k + 1, w); });
+  for (let r = 2; r <= rows.length + 1; r++) sh.getRange(r, 1, 1, head.length).setBackground(r % 2 ? '#f6f8f7' : '#ffffff');
+  sh.getRange(2, 1, rows.length, 1).setFontWeight('bold');
+  if (ss.getSheets()[0].getName() !== '한눈에') { ss.setActiveSheet(sh); ss.moveActiveSheet(1); }
 }
