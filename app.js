@@ -102,7 +102,7 @@
 
   // 배경 테마: 초록 그라데이션(기본) 또는 연한 회색
   // 색 테마: 설정에서 고름. grey·green은 예전(연두 포인트) 디자인
-  const THEMES = ['pro', 'navy', 'plum', 'ocean', 'charcoal', 'wine', 'grey', 'green'];
+  const THEMES = ['pro', 'navy', 'plum', 'ocean', 'charcoal', 'wine'];
   function setTheme(t) {
     const v = THEMES.includes(t) ? t : 'pro';
     document.documentElement.dataset.bg = v;
@@ -255,15 +255,14 @@
         <header class="sec-head">
           <span class="sec-no">${String(sec.no).padStart(2, '0')}</span>
           <div class="sec-titles"><h2>${esc(sec.title)}</h2><p>${esc(sec.lead)}</p></div>
-          <label class="check"><input type="checkbox" data-key="확인_${esc(sec.title)}" /> 확인</label>
         </header>
         ${tiles ? `<div class="tiles">${tiles}</div>` : ''}
         ${sec.id === 'equity' ? '<div class="sector-box" id="sectorBox"></div>' : ''}
         ${sigs ? `<div class="signals">${sigs}</div>` : ''}
-        ${releases}
-        ${manual ? `<div class="fields">${manual}</div>` : ''}
-        <details class="qs"><summary>생각할 질문</summary><ul>${qs}</ul></details>
         <div class="links">${links}</div>
+        <details class="qs"><summary>생각할 질문</summary><ul>${qs}</ul></details>
+        ${releases || manual ? `<details class="qs manual-box"><summary>직접 기록 (선택)</summary>${releases}${manual ? `<div class="fields">${manual}</div>` : ''}
+          <label class="check"><input type="checkbox" data-key="확인_${esc(sec.title)}" /> 이 섹션 확인함</label></details>` : ''}
       </article>`;
     }).join('');
   }
@@ -282,8 +281,7 @@
         <div class="chips">${chips || '<span class="muted">데이터를 불러오면 표시됩니다</span>'}</div>
         ${flags ? `<ul class="flags">${flags}</ul>` : ''}
       </div>
-      <div class="ov-right">
-        <div class="ov-label">점검 진행</div>
+      <div class="ov-right" hidden>
         <div class="progress"><div class="bar" id="progBar"></div></div>
         <div class="prog-text" id="progText">0 / ${C.daily.length}</div>
       </div>`;
@@ -319,9 +317,10 @@
 
   function renderConclusion() {
     $('#conclusionPanel').innerHTML = `
-      <div class="card concl">
-        <div class="concl-head"><h2>오늘의 결론</h2><button class="btn mini ghost" id="toggleGuides" type="button">${guidesOpen() ? '가이드 모두 접기' : '가이드 모두 펴기'}</button></div>
-        <p class="hint">1~8을 확인한 뒤, AI를 보기 전에 <b>내 결론부터</b> 씁니다. 각 칸의 가이드는 오늘 데이터에 맞춰 바뀝니다.</p>
+      <details class="card concl my-concl" id="myConcl">
+        <summary><div class="my-sum"><div><h2>내 결론 직접 쓰기 <span class="muted">선택</span></h2><span class="muted small">쓰고 싶은 날만 펼치세요. 쓴 날은 '나'의 적중률도 채점돼요.</span></div><span class="my-toggle"></span></div></summary>
+        <div class="concl-head"><span></span><button class="btn mini ghost" id="toggleGuides" type="button">${guidesOpen() ? '가이드 모두 접기' : '가이드 모두 펴기'}</button></div>
+        <p class="hint">AI 결론을 보기 전에 내 생각을 먼저 써 보면 비교가 더 잘 돼요. 각 칸의 가이드는 오늘 데이터에 맞춰 바뀝니다.</p>
         <div class="brief-box">
           <div><b>바쁜 날은 빠른 브리핑</b> <span class="mode-tag" id="modeTag"></span>
             <div class="muted">AI가 결론 칸과 전망을 채웁니다. 시트에 'AI 브리핑'으로 기록돼 직접 쓴 날과 따로 집계됩니다.</div></div>
@@ -375,11 +374,11 @@
           <div class="ai-out" id="aiOut"><span class="muted">아직 분석하지 않았습니다.</span></div>
         </div>
 
-        <p class="hint">증권사 리포트와의 교차검증은 <a href="#" data-act="goto-brief">오늘의 브리핑</a> 탭에서 합니다.</p>
+        <p class="hint">증권사 리포트와의 교차검증은 <a href="#" data-act="goto-brief">오늘의 브리핑</a>에서 합니다.</p>
 
         <button class="btn primary block" id="saveDaily">구글 시트에 저장</button>
         <div class="save-note" id="saveNote">같은 날짜로 다시 저장하면 그날 기록을 덮어씁니다.</div>
-      </div>`;
+      </details>`;
   }
 
   // ---------- 결론 가이드 (데이터가 바뀔 때마다 다시 그림) ----------
@@ -822,10 +821,19 @@
     renderCenter(); renderBrief();
   }
 
-  function gotoTab(name) {
-    const t = $(`.tab[data-tab="${name}"]`);
-    if (t) t.click();
+  // 메뉴에 없는 화면(리서치센터·이벤트일·주간 점검)은 부모 메뉴를 켠 채로 보여줌
+  const NAV_PARENT = { center: 'brief', event: 'daily', weekly: 'daily' };
+  function showView(name) {
+    const nav = NAV_PARENT[name] || name;
+    $$('.tab').forEach((x) => x.classList.toggle('active', x.dataset.tab === nav));
+    $$('.view').forEach((v) => v.classList.toggle('active', v.id === 'view-' + name));
+    if (name === 'records' && !state.records) loadRecords();
+    if (name === 'industry' && state.industryTried !== state.date) { state.industryTried = state.date; loadIndustry(true); }
+    if (name === 'company' && state.companyTried !== state.date) { state.companyTried = state.date; loadCompany(true); }
+    if (name === 'center' && !(state.debate && state.debate.open) && state.morningTried !== state.date) { state.morningTried = state.date; loadMorning(true); }
+    window.scrollTo(0, 0);
   }
+  function gotoTab(name) { showView(name); }
 
 
   // ---------- 오늘의 브리핑 (읽기 중심 + 교차검증) ----------
@@ -1753,14 +1761,7 @@
 
   // ---------- 이벤트 연결 ----------
   function bind() {
-    $$('.tab').forEach((t) => t.addEventListener('click', () => {
-      $$('.tab').forEach((x) => x.classList.toggle('active', x === t));
-      $$('.view').forEach((v) => v.classList.toggle('active', v.id === 'view-' + t.dataset.tab));
-      if (t.dataset.tab === 'records' && !state.records) loadRecords();
-      if (t.dataset.tab === 'industry' && state.industryTried !== state.date) { state.industryTried = state.date; loadIndustry(true); }
-      if (t.dataset.tab === 'company' && state.companyTried !== state.date) { state.companyTried = state.date; loadCompany(true); }
-      if (t.dataset.tab === 'center' && !(state.debate && state.debate.open) && state.morningTried !== state.date) { state.morningTried = state.date; loadMorning(true); }
-    }));
+    $$('.tab').forEach((t) => t.addEventListener('click', () => showView(t.dataset.tab)));
     $('#checkDate').value = state.date;
     $('#checkDate').addEventListener('change', (e) => {
       saveDraft();
@@ -1824,8 +1825,9 @@
       const act = e.target.closest('[data-act]');
       if (act) {
         const a = act.dataset.act;
-        if (a === 'goto-conclusion') { gotoTab('daily'); setTimeout(() => $('#conclusionPanel').scrollIntoView({ behavior: 'smooth' }), 50); return; }
+        if (a === 'goto-conclusion') { gotoTab('daily'); if ($('#myConcl')) $('#myConcl').open = true; setTimeout(() => $('#conclusionPanel').scrollIntoView({ behavior: 'smooth' }), 50); return; }
         if (a === 'goto-center') { e.preventDefault(); gotoTab('center'); return; }
+        if (a === 'goto') { e.preventDefault(); gotoTab(act.dataset.val); return; }
         if (a === 'ind-region') { state.indRegion = act.dataset.val; renderIndustry(); return; }
         if (a === 'sec-period') { state.secPeriod = act.dataset.val; renderSectors(); return; }
         if (a === 'sec-fill') { sectorFill(); return; }
@@ -1842,7 +1844,7 @@
         if (a === 'goto-company') { e.preventDefault(); gotoTab('company'); return; }
         if (a === 'goto-brief') { e.preventDefault(); gotoTab('brief'); return; }
         if (a === 'load-scores') { e.preventDefault(); loadRecords(); return; }
-        if (a === 'copy-ai-concl') { e.preventDefault(); if (conclusionText(collect($('#view-daily'))) && !confirm('내 결론 칸을 AI 결론으로 바꿀까요?')) return; applyConclusion(state.aiConcl || {}, 'AI 리서치센터'); gotoTab('daily'); setTimeout(() => $('#conclusionPanel').scrollIntoView({ behavior: 'smooth' }), 50); return; }
+        if (a === 'copy-ai-concl') { e.preventDefault(); if (conclusionText(collect($('#view-daily'))) && !confirm('내 결론 칸을 AI 결론으로 바꿀까요?')) return; applyConclusion(state.aiConcl || {}, 'AI 리서치센터'); gotoTab('daily'); if ($('#myConcl')) $('#myConcl').open = true; setTimeout(() => $('#conclusionPanel').scrollIntoView({ behavior: 'smooth' }), 50); return; }
         if (a === 'debate-resume') { const f = (state.debateRun || {}).failed; f === 'chief' ? runChief() : runDebate(f); return; }
         if (act.dataset.act === 'cmp-to-memo') {
           const plain = (state.cmpText || '').replace(/^#+\s*/gm, '').replace(/\*\*/g, '');

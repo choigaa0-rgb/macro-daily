@@ -1105,3 +1105,19 @@ details.rank-box[open] > summary { margin-bottom: 12px; }
   .rep-tbl th:nth-child(5), .rep-tbl td:nth-child(5) { display: none; }
   .link-list li { flex-direction: column; gap: 2px; }
 }
+
+/* ===== 메뉴 정리 (읽기 3 + 확인 2) ===== */
+#view-daily .layout { grid-template-columns: minmax(0, 1fr); }
+#view-daily .col-side { position: static; }
+.daily-head { margin-bottom: 4px; }
+.back-link { display: inline-block; margin: 0 0 12px 4px; font-size: 13.5px; font-weight: 650; color: var(--ink-3); text-decoration: none; }
+.back-link:hover { color: var(--accent); }
+details.my-concl > summary { list-style: none; cursor: pointer; }
+details.my-concl > summary::-webkit-details-marker { display: none; }
+details.my-concl .my-sum { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+details.my-concl .my-sum h2 { margin: 0 0 2px; }
+details.my-concl .my-toggle::after { content: '펼치기'; font-size: 12.5px; font-weight: 650; color: var(--ink-3); white-space: nowrap; }
+details.my-concl[open] .my-toggle::after { content: '접기'; }
+#view-daily .overview { grid-template-columns: 1fr; }
+details.my-concl[open] > summary { margin-bottom: 12px; }
+.manual-box .check { display: inline-flex; gap: 6px; margin-top: 10px; font-size: 13px; }
