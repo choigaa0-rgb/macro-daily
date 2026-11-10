@@ -306,8 +306,16 @@ function reportSummary(reports, price) {
   if (!goals.length) return null;
   const mid = goals.length % 2 ? goals[(goals.length - 1) / 2] : (goals[goals.length / 2 - 1] + goals[goals.length / 2]) / 2;
   const ops = {};
-  reports.forEach((x) => { if (x.opinion) ops[x.opinion] = (ops[x.opinion] || 0) + 1; });
-  return { n: goals.length, min: goals[0], max: goals[goals.length - 1], median: Math.round(mid), gap: price ? Math.round((mid / price - 1) * 1000) / 10 : null, opinions: ops };
+  // 증권사마다 다른 표기(Buy·매수·BUY, StrongBuy·강력매수, Hold·중립·MarketPerform …)를 한국어로 묶음
+  const norm = (o) => { const t = String(o).replace(/[\s_-]/g, '').toLowerCase();
+    if (/strongbuy|강력매수|적극매수/.test(t)) return '강력매수';
+    if (/^(buy|매수|outperform|overweight|trading ?buy)$/.test(t) || /buy|매수|outperform|overweight/.test(t)) return '매수';
+    if (/hold|중립|neutral|marketperform|보유/.test(t)) return '중립';
+    if (/sell|매도|underperform|reduce/.test(t)) return '매도';
+    return o; };
+  reports.forEach((x) => { if (x.opinion) { const k = norm(x.opinion); ops[k] = (ops[k] || 0) + 1; } });
+  const dates = reports.filter((x) => x.goal).map((x) => x.date).sort();
+  return { n: goals.length, from: dates[0], to: dates[dates.length - 1], min: goals[0], max: goals[goals.length - 1], median: Math.round(mid), gap: price ? Math.round((mid / price - 1) * 1000) / 10 : null, opinions: ops };
 }
 
 async function dartCompany(corp) {

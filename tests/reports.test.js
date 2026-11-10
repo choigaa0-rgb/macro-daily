@@ -13,5 +13,5 @@ Date.now = realNow;
 assert.deepStrictEqual(r.map((x) => [x.broker, x.goal, x.opinion]), [['교보증권', 500000, 'Buy'], ['하나증권', 480000, 'Buy']], '다른 종목·90일 지난 리포트 제외');
 assert.strictEqual(r[0].link, 'https://stock.naver.com/research/company/97500');
 const s = reportSummary(r, 200000);
-assert.deepStrictEqual([s.min, s.max, s.median, s.gap, s.opinions.Buy], [480000, 500000, 490000, 145, 2]);
+assert.deepStrictEqual([s.min, s.max, s.median, s.gap, s.opinions['매수'], s.from], [480000, 500000, 490000, 145, 2, '2026-10-30']);
 console.log('ok - 증권사 리포트: 같은 종목만, 목표주가 범위·중간값·현재가 대비, 투자의견 개수');

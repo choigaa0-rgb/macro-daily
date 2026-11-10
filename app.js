@@ -1120,7 +1120,7 @@
     const won = (v) => `${Math.round(v).toLocaleString('ko-KR')}원`;
     const ops = S0 ? Object.entries(S0.opinions).map(([o, n]) => `${o} ${n}`).join(' · ') : '';
     return `<b>증권사 리포트</b> <span class="muted small">최근 90일 · 증권사 의견 (우리 의견 아님)</span>
-      ${S0 ? `<p class="street">목표주가 ${S0.n}건: ${won(S0.min)}~${won(S0.max)}, 중간값 ${won(S0.median)}${S0.gap != null ? ` (현재가 대비 ${S0.gap > 0 ? '+' : ''}${S0.gap}%)` : ''}${ops ? `<br>투자의견 ${esc(ops)}` : ''}</p>` : ''}
+      ${S0 ? `<p class="street">목표주가 ${S0.n}건${S0.from ? ` (${esc(S0.from.slice(5))}~${esc(S0.to.slice(5))} 발표)` : ''}: ${won(S0.min)}~${won(S0.max)}, 중간값 ${won(S0.median)}${S0.gap != null ? ` (현재가 대비 ${S0.gap > 0 ? '+' : ''}${S0.gap}%)` : ''}${ops ? `<br>투자의견 ${esc(ops)}` : ''}</p>` : ''}
       ${k.street_view ? `<p class="street"><b>증권사 시각</b> ${esc(k.street_view)}</p>` : ''}
       ${R.length ? `<ul>${R.map((x) => `<li><a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title)}</a> <span class="muted">${esc(x.broker)} · ${esc(x.date)}${x.goal ? ` · ${won(x.goal)}` : ''}${x.opinion ? ` · ${esc(x.opinion)}` : ''}</span></li>`).join('')}</ul>` : '<p class="muted">최근 90일 리포트 없음</p>'}`;
   }
