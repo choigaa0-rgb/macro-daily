@@ -135,7 +135,7 @@
     const suf = it.chgUnit === 'bp' ? 'bp' : it.chgUnit === '%' ? '%' : it.chgUnit;
     const dir = chg == null ? '' : chg > 0 ? 'up' : chg < 0 ? 'down' : '';
     const unit = def.unit && def.unit !== '%' ? ` <small>${esc(def.unit)}</small>` : def.unit === '%' ? '<small>%</small>' : '';
-    return `<div class="tile" title="${esc(def.desc)}">
+    return `<div class="tile" title="${esc(def.desc)}&#10;${esc(it.source)} · ${esc(it.date || '')}">
       <div class="t-label">${esc(def.label)}</div>
       <div class="t-row"><div class="t-value">${num(it.value, def.digits)}${unit}</div>${sparkline(it.spark)}</div>
       <div class="t-chg ${dir}">${signed(chg, d, suf)} <span class="t-period">${isWeekly ? '5일' : '전일 대비'}</span></div>

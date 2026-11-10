@@ -1142,3 +1142,39 @@ details.x-det > summary .muted { font-size: 12.5px; }
 details.x-det[open] { padding-bottom: 12px; }
 #crossCard #saveBrief { margin-top: 14px; }
 @media (max-width: 640px) { .x-sum { grid-template-columns: 1fr; } .x-cell { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; } .x-s { width: 100%; } }
+
+/* ===== 시장 데이터: 가로 대시보드 배치 ===== */
+@media (min-width: 1180px) {
+  #view-daily #dailySections { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+  #view-daily #dailySections > .sec { margin: 0; min-width: 0; grid-column: span 4; }
+  #sec-rates { order: 1; } #sec-fx { order: 2; } #sec-commodity { order: 3; }
+  #sec-equity { order: 4; grid-column: span 12 !important; }
+  #sec-korea { order: 5; grid-column: span 8 !important; } #sec-risk { order: 6; }
+  #sec-policy { order: 7; grid-column: span 6 !important; } #sec-data { order: 8; grid-column: span 6 !important; }
+}
+#view-daily .sec { padding: 18px 20px; }
+#view-daily .sec-head { gap: 10px; margin-bottom: 12px; align-items: center; }
+#view-daily .sec-head h2 { font-size: 15.5px; margin: 0; }
+#view-daily .sec-head p { font-size: 12px; margin: 1px 0 0; color: var(--ink-3); }
+#view-daily .sec-no { width: 26px; height: 26px; font-size: 12px; border-radius: 8px; flex: none; }
+#view-daily .tiles { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+#view-daily .tile { padding: 10px 11px; }
+#view-daily .t-value { font-size: 18px; }
+#view-daily .t-sub { -webkit-line-clamp: 1; }
+#view-daily .signals { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; margin-top: 10px; }
+#view-daily .sec .links { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 10px; font-size: 12px; }
+#view-daily .sec details.qs { display: inline-block; margin: 8px 14px 0 0; vertical-align: top; }
+#view-daily .sec details.qs[open] { display: block; }
+#view-daily .sec details.qs > summary { font-size: 12.5px; color: var(--ink-3); }
+#view-daily .overview { margin-bottom: 14px; }
+@media (min-width: 1180px) { #sec-equity .sector-box .sec-panels { grid-template-columns: 1fr 1fr; } }
+/* 대시보드용 작은 타일: 설명·출처는 마우스를 올리면(title) 보이고, 그래프는 숫자 아래 */
+#view-daily .sec-no { width: auto; height: auto; min-width: 26px; padding: 4px 7px; text-align: center; line-height: 1; white-space: nowrap; }
+#view-daily .tiles { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+#view-daily .tile .t-sub, #view-daily .tile .t-src { display: none; }
+#view-daily .tile .t-row { flex-direction: column; align-items: stretch; gap: 2px; }
+#view-daily .tile .spark { flex: none; width: 100%; height: 22px; order: 3; }
+#view-daily .tile .t-value { font-size: 17px; }
+#view-daily .tile .t-period { display: none; }
+#view-daily .tile .t-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sec-equity .tiles, #sec-korea .tiles { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
