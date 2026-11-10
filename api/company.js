@@ -164,7 +164,7 @@ function mailSection(c) {
     ${c.verify && c.verify.bad.length ? `<p style="margin:4px 0;font-size:12px;color:#a2620b">숫자 근거 확인 필요: ${c.verify.bad.map(esc).join(', ')}</p>` : ''}`;
 }
 
-async function buildCard({ ticker, auto }) {
+async function buildCard({ ticker, auto, save = true }) {
   const started = Date.now();
   const date = kstDate();
   const [news, issues, briefs] = await Promise.all([D.fetchNews({ hours: 48, max: 200 }), sheetRows('산업 이슈', 3), sheetRows('자동 브리핑', 3)]);
@@ -207,6 +207,7 @@ ${macro || '(없음)'}`;
   if (!card) throw new Error('AI 응답 형식을 읽지 못했습니다');
   const verify = verifyNumbers(card, data, attention);
   const result = { date, reason, attention, data, card, verify, model: r.model };
+  if (!save) { result.demo = true; return result; } // 체험용: 기록을 덮어쓰지 않음
   const saved = await sheetPost({ sheet: '기업 분석', record: {
     '날짜': date, '생성시각': new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false }), '티커': company.ticker, '기업': company.name,
     '시장': company.market, '선정 이유': reason, '주목도 점수': attention ? attention.score : '', '한 줄 요약': card.one_liner || '',
@@ -221,7 +222,8 @@ ${macro || '(없음)'}`;
 module.exports = async (req, res) => {
   const url = new URL(req.url, 'http://x');
   // 주목도 순위는 AI를 쓰지 않는 읽기라 비밀번호 없이, 카드 만들기(AI)는 비밀번호 필요
-  if (url.searchParams.get('rank') !== '1' && !isAuthorized(req)) return sendJson(res, 401, { ok: false, error: NEED_PASS });
+  const who = url.searchParams.get('rank') === '1' ? 'read' : isAuthorized(req);
+  if (!who) return sendJson(res, 401, { ok: false, error: NEED_PASS });
   try {
     if (url.searchParams.get('rank') === '1') {
       const date = kstDate();
@@ -231,7 +233,7 @@ module.exports = async (req, res) => {
     }
     let body = {};
     if (req.method === 'POST') { try { body = await readBody(req); } catch (e) { body = {}; } }
-    const result = await buildCard({ ticker: body.ticker || url.searchParams.get('ticker'), auto: !body.ticker });
+    const result = await buildCard({ ticker: body.ticker || url.searchParams.get('ticker'), auto: !body.ticker, save: who === 'admin' });
     const out = { ok: true, result };
     if (url.searchParams.get('part') === '1') out.mailHtml = mailSection(result);
     return sendJson(res, 200, out);

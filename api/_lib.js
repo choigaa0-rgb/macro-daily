@@ -8,14 +8,26 @@ function sendJson(res, status, body) {
 }
 
 const NEED_PASS = '새로 만들기와 저장은 관리자 비밀번호가 필요합니다. 매일 아침 자동으로 만들어진 결과는 비밀번호 없이 \'불러오기\'로 볼 수 있습니다.';
-// APP_PASSCODE 환경변수가 설정돼 있으면, 요청 헤더의 비밀번호와 같아야 통과
-function checkPasscode(req, res) {
-  const expected = process.env.APP_PASSCODE;
-  if (!expected) return true; // 비밀번호를 설정하지 않았으면 누구나 사용 가능
-  const given = req.headers['x-app-passcode'];
-  if (given && given === expected) return true;
-  sendJson(res, 401, { ok: false, error: NEED_PASS });
-  return false;
+const DEMO_NO_SAVE = '체험용 비밀번호로는 시트에 저장되지 않습니다. 화면에 나온 결과는 그대로 볼 수 있습니다.';
+// 요청한 사람의 권한: 'admin'(관리자·아침 자동 실행) | 'demo'(체험용: AI 실행은 되고 저장은 안 됨) | null
+// APP_PASSCODE를 설정하지 않았으면(로컬 개발) 누구나 관리자
+function role(req) {
+  const admin = process.env.APP_PASSCODE;
+  if (!admin) return 'admin';
+  const url = new URL(req.url, 'http://x');
+  const given = req.headers['x-app-passcode'] || url.searchParams.get('pass');
+  if (given && given === admin) return 'admin';
+  if (process.env.CRON_SECRET && req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`) return 'admin';
+  const demo = process.env.DEMO_PASSCODE;
+  if (demo && given && given === demo) return 'demo';
+  return null;
+}
+// 통과하면 권한 문자열을 돌려주고, 아니면 401 응답 후 null
+function checkPasscode(req, res, { allowDemo = true } = {}) {
+  const r = role(req);
+  if (r === 'admin' || (r === 'demo' && allowDemo)) return r;
+  sendJson(res, r === 'demo' ? 403 : 401, { ok: false, error: r === 'demo' ? DEMO_NO_SAVE : NEED_PASS });
+  return null;
 }
 
 async function fetchWithTimeout(url, options = {}, ms = 9000) {
@@ -175,17 +187,11 @@ async function sheetRows(sheet, limit = 30) {
     return j.ok ? j.rows || [] : [];
   } catch (e) { return []; }
 }
-function isAuthorized(req) {
-  const url = new URL(req.url, 'http://x');
-  const pass = process.env.APP_PASSCODE;
-  if (!pass) return true;
-  return req.headers['x-app-passcode'] === pass || url.searchParams.get('pass') === pass ||
-    (process.env.CRON_SECRET && req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`);
-}
+function isAuthorized(req) { return role(req); }
 function parseJsonLoose(text) {
   const t = String(text).replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
   try { return JSON.parse(t); } catch (e) { const m = t.match(/\{[\s\S]*\}/); try { return m ? JSON.parse(m[0]) : null; } catch (e2) { return null; } }
 }
 const kstDate = () => new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
 
-module.exports = { NEED_PASS, sendJson, checkPasscode, fetchWithTimeout, readBody, callGemini, listModels, pickLight, sheetPost, sheetRows, isAuthorized, parseJsonLoose, kstDate };
+module.exports = { NEED_PASS, DEMO_NO_SAVE, role, sendJson, checkPasscode, fetchWithTimeout, readBody, callGemini, listModels, pickLight, sheetPost, sheetRows, isAuthorized, parseJsonLoose, kstDate };

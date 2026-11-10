@@ -5,7 +5,7 @@ const { sendJson, checkPasscode, fetchWithTimeout, readBody } = require('./_lib'
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'POST만 가능합니다' });
-  if (!checkPasscode(req, res)) return;
+  if (!checkPasscode(req, res, { allowDemo: false })) return; // 체험용 비밀번호는 저장 불가
 
   const hook = process.env.SHEET_WEBHOOK_URL;
   if (!hook) return sendJson(res, 500, { ok: false, error: 'SHEET_WEBHOOK_URL이 설정되지 않았습니다. README의 3단계를 참고하세요.' });

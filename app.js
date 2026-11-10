@@ -1063,8 +1063,8 @@
     state.industryBusy = true; renderIndustry();
     try {
       const j = await api('/api/industry', { method: 'POST', body: '{}' });
-      state.industry = j.data; state.industryMsg = ''; state.industryFrom = '';
-      toast(`산업 이슈 ${j.data.issues.length}개를 정리했습니다`, 'ok');
+      state.industry = j.data; state.industryMsg = ''; state.industryFrom = j.data.demo ? ' · 체험 모드 (기록에는 저장되지 않음)' : '';
+      toast(`산업 이슈 ${j.data.issues.length}개를 정리했습니다${j.data.demo ? ' (체험 모드: 기록에는 저장되지 않음)' : ''}`, 'ok');
     } catch (e) { toast(e.message, 'err'); state.industryMsg = e.message; }
     state.industryBusy = false; renderIndustry(); renderBrief();
   }
@@ -1140,9 +1140,9 @@
     state.companyBusy = ticker || 'auto'; renderCompany();
     try {
       const j = await api('/api/company', { method: 'POST', body: JSON.stringify(ticker ? { ticker } : {}) });
-      state.company = j.result; state.companyMsg = ''; state.companyFrom = '';
-      state.companyRows = null;
-      toast(`${j.result.data.company.name} 분석 카드를 만들었습니다`, 'ok');
+      state.company = j.result; state.companyMsg = ''; state.companyFrom = j.result.demo ? ' · 체험 모드 (기록에는 저장되지 않음)' : '';
+      if (!j.result.demo) state.companyRows = null;
+      toast(`${j.result.data.company.name} 분석 카드를 만들었습니다${j.result.demo ? ' (체험 모드: 기록에는 저장되지 않음)' : ''}`, 'ok');
       setTimeout(() => $('#companyCard') && $('#companyCard').scrollIntoView({ behavior: 'smooth' }), 50);
     } catch (e) { toast(e.message, 'err'); }
     state.companyBusy = null; renderCompany(); renderBrief();

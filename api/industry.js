@@ -91,7 +91,7 @@ function mailSection(data) {
       <div style="font-size:12px;margin-top:3px">${it.links.map((l) => `<a href="${esc(l.link)}">${esc(l.source)}</a>`).join(' · ')}</div></div>`).join('')}`;
 }
 
-async function build() {
+async function build({ save = true } = {}) {
   const started = Date.now();
   const date = kstDate();
   const krNames = Promise.race([krSectors().then((k) => (k.ok ? k.rows.map((r) => r.name) : null)).catch(() => null), new Promise((r) => setTimeout(() => r(null), 6000))]);
@@ -109,6 +109,7 @@ async function build() {
   if (!j || !Array.isArray(j.issues)) throw new Error('AI 응답 형식을 읽지 못했습니다');
   const issues = verifyIssues(j.issues, news.items, kospiList);
   const data = { date, headline: j.headline || '', issues, model: r.model, newsCount: news.items.length, feedErrors: news.errors, macroUsed: !!macro };
+  if (!save) { data.demo = true; return data; } // 체험용: 기록을 덮어쓰지 않음
   await sheetPost({ sheet: '산업 이슈', record: {
     '날짜': date, '생성시각': new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false }), '한 줄 요약': data.headline,
     '이슈 수': issues.length, '산업': issues.map((x) => [x.region, x.sector, x.industry].filter(Boolean).join('·')).join(', '), '관련 기업': [...new Set(issues.flatMap((x) => x.companies.map((c) => c.name)))].join(', '),
@@ -118,10 +119,11 @@ async function build() {
 }
 
 module.exports = async (req, res) => {
-  if (!isAuthorized(req)) return sendJson(res, 401, { ok: false, error: NEED_PASS });
+  const who = isAuthorized(req);
+  if (!who) return sendJson(res, 401, { ok: false, error: NEED_PASS });
   const url = new URL(req.url, 'http://x');
   try {
-    const data = await build();
+    const data = await build({ save: who === 'admin' });
     const out = { ok: true, data };
     if (url.searchParams.get('part') === '1') out.mailHtml = mailSection(data);
     return sendJson(res, 200, out);
