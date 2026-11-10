@@ -7,7 +7,7 @@
 // 교차검증: AI 문장에 나온 숫자가 제공한 데이터에 있는지 자동 대조, 관련 뉴스·공시 링크로 사실 확인 가능하게 함.
 // 투자 권유가 아닌 분석 카드: BULL·BEAR 논거와 체크포인트를 나란히 보여줌.
 
-const { sendJson, isAuthorized, readBody, callGemini, sheetPost, sheetRows, parseJsonLoose, kstDate } = require('./_lib');
+const { NEED_PASS, sendJson, isAuthorized, readBody, callGemini, sheetPost, sheetRows, parseJsonLoose, kstDate } = require('./_lib');
 const D = require('./_data');
 
 const PROMPT = `너는 한국 증권사 리서치센터의 기업 애널리스트다. 주어진 데이터로 기업 1곳의 '스톡피치 형식 분석 카드'를 만든다.
@@ -219,8 +219,9 @@ ${macro || '(없음)'}`;
 }
 
 module.exports = async (req, res) => {
-  if (!isAuthorized(req)) return sendJson(res, 401, { ok: false, error: '비밀번호가 맞지 않습니다.' });
   const url = new URL(req.url, 'http://x');
+  // 주목도 순위는 AI를 쓰지 않는 읽기라 비밀번호 없이, 카드 만들기(AI)는 비밀번호 필요
+  if (url.searchParams.get('rank') !== '1' && !isAuthorized(req)) return sendJson(res, 401, { ok: false, error: NEED_PASS });
   try {
     if (url.searchParams.get('rank') === '1') {
       const date = kstDate();

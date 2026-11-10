@@ -25,7 +25,15 @@
   function todayKST() {
     const d = new Date(Date.now() + 9 * 3600000);
     return d.toISOString().slice(0, 10);
+  }  // 오늘 결과가 아직 없으면(주말·이른 아침) 가장 최근 결과를 보여줌. 날짜를 직접 고른 경우엔 그날 것만
+  function pickRow(rows, need) {
+    const ok = (rows || []).filter((r) => r['날짜'] && (!need || r[need]));
+    const exact = ok.find((r) => r['날짜'] === state.date);
+    if (exact || state.date !== todayKST()) return exact || null;
+    return ok.filter((r) => r['날짜'] < state.date).sort((a, b) => (a['날짜'] < b['날짜'] ? 1 : -1))[0] || null;
   }
+  const fromNote = (row) => (row && row['날짜'] !== state.date ? ` · ${row['날짜']} 결과 (오늘 것은 아직 없음)` : '');
+
   function weekStart(dateStr) {
     const d = new Date(dateStr + 'T00:00:00Z');
     const day = (d.getUTCDay() + 6) % 7; // 월요일=0
@@ -800,7 +808,7 @@
   async function loadMorning(silent) {
     try {
       const j = await api('/api/history?sheet=' + encodeURIComponent('자동 브리핑') + '&limit=10');
-      const row = (j.rows || []).find((r) => r['날짜'] === state.date);
+      const row = pickRow(j.rows, '토론 JSON') || (j.rows || []).find((r) => r['날짜'] === state.date);
       if (!row || !row['토론 JSON']) {
         state.morningMsg = row ? `오늘 아침 브리핑은 있지만 AI 토론이 없습니다 (${row['AI 오류'] || '오류'}). 토론 시작을 눌러 직접 만들 수 있어요.` : `${state.date} 아침 자동 브리핑이 아직 없습니다.`;
         if (!silent) toast(state.morningMsg, 'err');
@@ -808,10 +816,10 @@
         state.debate = JSON.parse(row['토론 JSON']);
         if (row['AI 결론 JSON']) {
           state.aiConcl = JSON.parse(row['AI 결론 JSON']);
-          state.aiSrc = { source: '아침 자동', at: row['생성시각'] || '', model: row['모델'] || '' };
+          state.aiSrc = { source: '아침 자동' + fromNote(row), at: row['생성시각'] || '', model: row['모델'] || '' };
         }
         state.morningMsg = '';
-        saveDraft();
+        if (row['날짜'] === state.date) saveDraft(); // 지난 결과를 보여줄 때는 오늘 기록으로 저장하지 않음
         if (!silent) toast('오늘 아침 자동 토론을 불러왔습니다', 'ok');
       }
     } catch (e) {
@@ -1044,8 +1052,9 @@
   async function loadIndustry(silent) {
     try {
       const j = await api('/api/history?sheet=' + encodeURIComponent('산업 이슈') + '&limit=10');
-      const row = (j.rows || []).find((r) => r['날짜'] === state.date);
-      state.industry = row && row['이슈 JSON'] ? JSON.parse(row['이슈 JSON']) : null;
+      const row = pickRow(j.rows, '이슈 JSON');
+      state.industry = row ? JSON.parse(row['이슈 JSON']) : null;
+      state.industryFrom = fromNote(row);
       state.industryMsg = state.industry ? '' : `${state.date} 산업 이슈가 아직 없습니다.`;
     } catch (e) { state.industryMsg = e.message; if (!silent) toast(e.message, 'err'); }
     renderIndustry(); renderBrief();
@@ -1054,7 +1063,7 @@
     state.industryBusy = true; renderIndustry();
     try {
       const j = await api('/api/industry', { method: 'POST', body: '{}' });
-      state.industry = j.data; state.industryMsg = '';
+      state.industry = j.data; state.industryMsg = ''; state.industryFrom = '';
       toast(`산업 이슈 ${j.data.issues.length}개를 정리했습니다`, 'ok');
     } catch (e) { toast(e.message, 'err'); state.industryMsg = e.message; }
     state.industryBusy = false; renderIndustry(); renderBrief();
@@ -1089,7 +1098,7 @@
     box.innerHTML = `
       <div class="card brief-hero"><div class="wk-head"><div>
         <div class="ph-kicker">산업 이슈</div><h1 class="ph-title">${esc(niceDate(state.date))}</h1>
-        <div class="muted">${I ? `뉴스 ${I.newsCount}건 중 ${I.issues.length}개 이슈 · ${esc(I.model || '')}${I.macroUsed ? ' · 오늘 매크로 반영' : ''}` : esc(state.industryMsg || '불러오는 중…')}</div></div>
+        <div class="muted">${I ? `${state.industryFrom ? esc(state.industryFrom.slice(3)) + ' · ' : ''}뉴스 ${I.newsCount}건 중 ${I.issues.length}개 이슈 · ${esc(I.model || '')}${I.macroUsed ? ' · 오늘 매크로 반영' : ''}` : esc(state.industryMsg || '불러오는 중…')}</div></div>
         <div class="rec-actions"><button class="btn" data-act="load-industry" type="button" ${busy ? 'disabled' : ''}>불러오기</button>
         <button class="btn primary" data-act="make-industry" type="button" ${busy ? 'disabled' : ''}>${busy ? '정리 중… (최대 1분)' : I ? '다시 만들기' : '지금 만들기'}</button></div></div>
         ${I && I.headline ? `<p class="headline">${esc(I.headline)}</p>` : ''}
@@ -1114,7 +1123,8 @@
     try {
       const j = await api('/api/history?sheet=' + encodeURIComponent('기업 분석') + '&limit=30');
       state.companyRows = j.rows || [];
-      const row = state.companyRows.find((r) => r['날짜'] === state.date);
+      const row = pickRow(state.companyRows, '카드 JSON');
+      state.companyFrom = fromNote(row);
       state.company = row && row['카드 JSON'] ? JSON.parse(row['카드 JSON']) : null;
       state.companyMsg = state.company ? '' : `${state.date} 기업 분석이 아직 없습니다.`;
     } catch (e) { state.companyMsg = e.message; if (!silent) toast(e.message, 'err'); }
@@ -1130,7 +1140,7 @@
     state.companyBusy = ticker || 'auto'; renderCompany();
     try {
       const j = await api('/api/company', { method: 'POST', body: JSON.stringify(ticker ? { ticker } : {}) });
-      state.company = j.result; state.companyMsg = '';
+      state.company = j.result; state.companyMsg = ''; state.companyFrom = '';
       state.companyRows = null;
       toast(`${j.result.data.company.name} 분석 카드를 만들었습니다`, 'ok');
       setTimeout(() => $('#companyCard') && $('#companyCard').scrollIntoView({ behavior: 'smooth' }), 50);
@@ -1234,7 +1244,7 @@
     box.innerHTML = `
       <div class="card brief-hero"><div class="wk-head"><div>
         <div class="ph-kicker">오늘의 기업</div><h1 class="ph-title">${esc(niceDate(state.date))}</h1>
-        <div class="muted">${c ? `${esc(c.reason)} · ${esc(c.model || '')}` : esc(state.companyMsg || '불러오는 중…')}</div></div>
+        <div class="muted">${c ? `${state.companyFrom ? esc(state.companyFrom.slice(3)) + ' · ' : ''}${esc(c.reason)} · ${esc(c.model || '')}` : esc(state.companyMsg || '불러오는 중…')}</div></div>
         <div class="rec-actions"><button class="btn" data-act="load-rank" type="button" ${state.rankBusy ? 'disabled' : ''}>${state.rankBusy ? '계산 중…' : '주목도 상위 20 보기'}</button>
         <button class="btn primary" data-act="make-company" type="button" ${busy ? 'disabled' : ''}>${busy === 'auto' ? '분석 중… (최대 1분)' : c ? '자동 선정으로 다시 만들기' : '자동 선정해서 분석'}</button></div></div>
         <p class="hint">주가 변동·거래량·뉴스 언급으로 고른 오늘 가장 주목받는 기업 1곳. 숫자는 DART·SEC·Yahoo에서 직접 계산하고 AI는 해석만 합니다. 투자 권유가 아닌 분석 카드예요.</p>

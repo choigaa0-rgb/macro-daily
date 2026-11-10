@@ -7,13 +7,14 @@ function sendJson(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
+const NEED_PASS = '새로 만들기와 저장은 관리자 비밀번호가 필요합니다. 매일 아침 자동으로 만들어진 결과는 비밀번호 없이 \'불러오기\'로 볼 수 있습니다.';
 // APP_PASSCODE 환경변수가 설정돼 있으면, 요청 헤더의 비밀번호와 같아야 통과
 function checkPasscode(req, res) {
   const expected = process.env.APP_PASSCODE;
   if (!expected) return true; // 비밀번호를 설정하지 않았으면 누구나 사용 가능
   const given = req.headers['x-app-passcode'];
   if (given && given === expected) return true;
-  sendJson(res, 401, { ok: false, error: '비밀번호가 맞지 않습니다. 화면 오른쪽 위 설정에서 비밀번호를 입력하세요.' });
+  sendJson(res, 401, { ok: false, error: NEED_PASS });
   return false;
 }
 
@@ -187,4 +188,4 @@ function parseJsonLoose(text) {
 }
 const kstDate = () => new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
 
-module.exports = { sendJson, checkPasscode, fetchWithTimeout, readBody, callGemini, listModels, pickLight, sheetPost, sheetRows, isAuthorized, parseJsonLoose, kstDate };
+module.exports = { NEED_PASS, sendJson, checkPasscode, fetchWithTimeout, readBody, callGemini, listModels, pickLight, sheetPost, sheetRows, isAuthorized, parseJsonLoose, kstDate };

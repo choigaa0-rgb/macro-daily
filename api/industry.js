@@ -3,7 +3,7 @@
 // GET  /api/industry?part=1     아침 자동화용: 만들고 저장한 뒤 메일용 HTML도 돌려줌
 // 교차검증: AI가 단 출처 번호가 실제 기사인지, 이슈에 적은 관련 기업이 그 기사에 실제로 나오는지 확인
 
-const { sendJson, isAuthorized, callGemini, sheetPost, sheetRows, parseJsonLoose, kstDate } = require('./_lib');
+const { NEED_PASS, sendJson, isAuthorized, callGemini, sheetPost, sheetRows, parseJsonLoose, kstDate } = require('./_lib');
 const { fetchNews } = require('./_data');
 const { krSectors } = require('./sectors');
 
@@ -118,7 +118,7 @@ async function build() {
 }
 
 module.exports = async (req, res) => {
-  if (!isAuthorized(req)) return sendJson(res, 401, { ok: false, error: '비밀번호가 맞지 않습니다.' });
+  if (!isAuthorized(req)) return sendJson(res, 401, { ok: false, error: NEED_PASS });
   const url = new URL(req.url, 'http://x');
   try {
     const data = await build();
