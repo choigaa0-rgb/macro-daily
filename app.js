@@ -1113,6 +1113,26 @@
     } catch (e) { toast(e.message, 'err'); }
     state.companyBusy = null; renderCompany(); renderBrief();
   }
+  // 증권사 리포트는 자동으로 가져오지 않고, 직접 확인할 링크만 (네이버·한경 리서치는 화면을 브라우저에서 그려서 서버가 읽을 수 없음)
+  function reportBlock(c, k) {
+    if (c.data.company.market !== 'KR' || !c.data.reports) return '';
+    const R = c.data.reports, S0 = c.data.reportSummary;
+    const won = (v) => `${Math.round(v).toLocaleString('ko-KR')}원`;
+    const ops = S0 ? Object.entries(S0.opinions).map(([o, n]) => `${o} ${n}`).join(' · ') : '';
+    return `<b>증권사 리포트</b> <span class="muted small">최근 90일 · 증권사 의견 (우리 의견 아님)</span>
+      ${S0 ? `<p class="street">목표주가 ${S0.n}건: ${won(S0.min)}~${won(S0.max)}, 중간값 ${won(S0.median)}${S0.gap != null ? ` (현재가 대비 ${S0.gap > 0 ? '+' : ''}${S0.gap}%)` : ''}${ops ? `<br>투자의견 ${esc(ops)}` : ''}</p>` : ''}
+      ${k.street_view ? `<p class="street"><b>증권사 시각</b> ${esc(k.street_view)}</p>` : ''}
+      ${R.length ? `<ul>${R.map((x) => `<li><a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title)}</a> <span class="muted">${esc(x.broker)} · ${esc(x.date)}${x.goal ? ` · ${won(x.goal)}` : ''}${x.opinion ? ` · ${esc(x.opinion)}` : ''}</span></li>`).join('')}</ul>` : '<p class="muted">최근 90일 리포트 없음</p>'}`;
+  }
+  function researchLinks(co) {
+    const kr = co.market === 'KR';
+    const code = String(co.ticker || '').slice(0, 6);
+    const links = kr
+      ? [['네이버 증권 리서치', `https://stock.naver.com/research/company?searchText=${encodeURIComponent(co.name)}`], ['네이버 종목 (컨센서스)', `https://finance.naver.com/item/coinfo.naver?code=${code}`], ['한경컨센서스', 'https://markets.hankyung.com/consensus']]
+      : [['Finviz (애널리스트 의견·목표가)', `https://finviz.com/quote.ashx?t=${encodeURIComponent(co.ticker)}`], ['Yahoo Finance 애널리스트', `https://finance.yahoo.com/quote/${encodeURIComponent(co.ticker)}/analysis`]];
+    return `<b>${co.market === 'KR' ? '리포트 원문 보기' : '증권사 의견 확인'}</b><p class="muted small">AI 분석과 증권사 시각이 같은지 직접 비교해 보세요.${kr ? ' 한경컨센서스에서는 종목명으로 검색하세요.' : ''}</p>
+      <div class="rlinks">${links.map(([l, u]) => `<a class="btn mini" href="${esc(u)}" target="_blank" rel="noopener">${esc(l)}</a>`).join('')}</div>`;
+  }
   function renderCompany() {
     const box = $('#companyPanel');
     if (!box) return;
@@ -1160,7 +1180,7 @@
           ${c.verify && c.verify.bad.length ? `AI 문장에 데이터에 없는 숫자가 있습니다: <b>${c.verify.bad.map(esc).join(', ')}</b> — 위 핵심 숫자와 비교해 확인하세요.` : 'AI 문장의 숫자가 모두 제공 데이터에서 확인됩니다.'}</p>
         <div class="co-2">
           <div><b>관련 뉴스</b>${c.data.news.length ? `<ul>${c.data.news.map((n) => `<li><a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a> <span class="muted">${esc(n.source)}</span></li>`).join('')}</ul>` : '<p class="muted">최근 기사 없음</p>'}</div>
-          <div>${c.data.company.market === 'KR' ? `<b>증권사 리포트</b>${k.street_view ? `<p class="street"><b>증권사 시각</b> ${esc(k.street_view)}</p>` : ''}${(c.data.reports || []).length ? `<ul>${c.data.reports.map((x) => `<li><a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title)}</a> <span class="muted">${esc(x.broker)} · ${esc(x.date)}${x.pdf ? ` · <a href="${esc(x.pdf)}" target="_blank" rel="noopener">PDF</a>` : ''}</span></li>`).join('')}</ul>` : '<p class="muted">최근 60일 리포트 없음</p>'}` : ''}
+          <div>${reportBlock(c, k)}${researchLinks(c.data.company)}
             <b>최근 공시</b>${c.data.filings.length ? `<ul>${c.data.filings.map((f) => `<li><a href="${esc(f.link)}" target="_blank" rel="noopener">${esc(f.title)}</a> <span class="muted">${esc(f.date)}</span></li>`).join('')}</ul>` : '<p class="muted">최근 공시 없음</p>'}${c.data.hiddenFilings ? `<p class="muted small">임원·주요주주 지분 변동 보고 ${c.data.hiddenFilings}건은 숨겼어요.</p>` : ''}</div>
         </div>
       </div>` : ''}

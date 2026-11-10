@@ -277,44 +277,39 @@ async function dartDisclosures(corp) {
   return main;
 }
 
-// ---------- 증권사 리포트 (네이버 증권 리서치 · 종목분석) ----------
-// 제목·증권사·날짜·링크만 씀 (리포트 본문은 가져오지 않음). 한국 종목만.
-function parseNaverReports(html, days = 60) {
-  const out = [];
-  const cutoff = new Date(Date.now() + 9 * 3600000 - days * 86400000).toISOString().slice(2, 10).replace(/-/g, '.');
-  const strip = (x) => String(x).replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
-  for (const row of String(html).split(/<tr[\s>]/i)) {
-    const a = row.match(/href="([^"]*company_read\.naver\?[^"]*nid=(\d+)[^"]*)"[^>]*>([\s\S]*?)<\/a>/i);
-    if (!a) continue;
-    const cells = row.split(/<\/td>/i).map(strip);
-    const date = (row.match(/\b(\d{2}\.\d{2}\.\d{2})\b/) || [])[1];
-    if (!date || date < cutoff) continue;
-    const ti = cells.findIndex((c) => c.includes(strip(a[3])));
-    const broker = (cells[ti + 1] || '').replace(/\s/g, '') || '';
-    const pdf = (row.match(/href="(https?:[^"]+\.pdf)"/i) || [])[1] || '';
-    out.push({ date: `20${date.replace(/\./g, '-')}`, title: strip(a[3]), broker, link: `https://finance.naver.com/research/company_read.naver?nid=${a[2]}`, pdf });
-    if (out.length >= 6) break;
-  }
-  return out;
+// ---------- 증권사 리포트 (네이버 증권 리서치 API · 국내종목) ----------
+// 제목·증권사·날짜·목표주가·투자의견·링크만 씀 (리포트 본문 요약은 가져오지 않음). 한국 종목만.
+// 검색어(종목명)가 들어간 다른 회사 리포트도 섞여 오므로 종목코드가 같은 것만 남김
+function parseNaverResearch(json, stockCode, days = 90) {
+  const items = (json && json.items) || [];
+  const cutoff = new Date(Date.now() + 9 * 3600000 - days * 86400000).toISOString().slice(0, 10);
+  const pick = (o, re) => { const k = Object.keys(o).find((x) => re.test(x)); return k ? o[k] : ''; };
+  return items
+    .filter((x) => String(x.itemCode) === String(stockCode) && String(x.writeDate || '') >= cutoff)
+    .map((x) => {
+      const goal = Number(String(x.goalPrice || '').replace(/,/g, ''));
+      return { date: String(x.writeDate).slice(0, 10), title: String(x.title || '').trim(), broker: String(x.brokerName || '').trim(),
+        goal: goal > 0 ? goal : null, opinion: String(pick(x, /opinion/i) || '').trim(),
+        link: `https://stock.naver.com/research/company/${x.nid}` };
+    })
+    .slice(0, 8);
 }
-async function brokerReports(stockCode) {
-  const r = await fetchWithTimeout(`https://finance.naver.com/research/company_list.naver?searchType=itemCode&itemCode=${stockCode}&page=1`,
-    { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36', Referer: 'https://finance.naver.com/research/' } }, 7000);
+async function brokerReports(stockCode, name) {
+  const u = `https://stock.naver.com/api/stockSecurity/researches/v2/company?index=0&size=40&query=${encodeURIComponent(name)}`;
+  const r = await fetchWithTimeout(u, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36', Accept: 'application/json', Referer: 'https://stock.naver.com/research/company' } }, 7000);
   if (!r.ok) throw new Error(`네이버 리서치 ${r.status}`);
-  const buf = Buffer.from(await r.arrayBuffer());
-  let html;
-  try { html = new TextDecoder('euc-kr').decode(buf); } catch (e) { html = buf.toString('utf8'); }
-  const list = parseNaverReports(html);
-  if (!list.length) {
-    // 진단: 목록을 하나도 못 읽으면 원인을 짐작할 수 있게 페이지 모양을 알려줌
-    const links = (html.match(/company_read\.naver/g) || []).length;
-    const dates = html.match(/\d{2}\.\d{2}\.\d{2}/g) || [];
-    const title = ((html.match(/<title>([^<]*)<\/title>/i) || [])[1] || '').trim().slice(0, 40);
-    if (links === 0 || !dates.length) throw new Error(`목록을 읽지 못함 (페이지 ${Math.round(html.length / 1024)}KB, 리포트 링크 ${links}개, 날짜 ${dates.length}개, 제목 "${title}")`);
-    throw new Error(`최근 60일 리포트 없음으로 판단 (리포트 링크 ${links}개, 가장 최근 날짜 ${dates[0]})`);
-  }
-  return list;
+  return parseNaverResearch(await r.json(), stockCode);
 }
+// 목표주가 요약 (코드가 계산): 범위·중간값·현재가 대비, 투자의견 개수
+function reportSummary(reports, price) {
+  const goals = reports.map((x) => x.goal).filter(Boolean).sort((a, b) => a - b);
+  if (!goals.length) return null;
+  const mid = goals.length % 2 ? goals[(goals.length - 1) / 2] : (goals[goals.length / 2 - 1] + goals[goals.length / 2]) / 2;
+  const ops = {};
+  reports.forEach((x) => { if (x.opinion) ops[x.opinion] = (ops[x.opinion] || 0) + 1; });
+  return { n: goals.length, min: goals[0], max: goals[goals.length - 1], median: Math.round(mid), gap: price ? Math.round((mid / price - 1) * 1000) / 10 : null, opinions: ops };
+}
+
 async function dartCompany(corp) {
   const j = await dartGet('company.json', { corp_code: corp });
   if (j.status !== '000') return null;
@@ -392,4 +387,4 @@ async function secFilings(cik) {
   return out;
 }
 
-module.exports = { UNIVERSE, FEEDS, parseRss, fetchNews, newsFor, yahooChart, rankAttention, priceStats, unzipFirst, dartCorpCode, dartFinancials, dartShares, dartDisclosures, dartCompany, brokerReports, parseNaverReports, secCik, secFinancials, secFilings, annualPair, pickAccounts };
+module.exports = { UNIVERSE, FEEDS, parseRss, fetchNews, newsFor, yahooChart, rankAttention, priceStats, unzipFirst, dartCorpCode, dartFinancials, dartShares, dartDisclosures, dartCompany, brokerReports, parseNaverResearch, reportSummary, secCik, secFinancials, secFilings, annualPair, pickAccounts };

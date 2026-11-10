@@ -1028,3 +1028,5 @@ html.themed .co-mini-name { color: var(--t-accent); }
 .ind-filter button { white-space: nowrap; padding: 6px 14px; }
 .street { font-size: 13.5px; margin: 6px 0 4px; padding: 8px 10px; border-radius: 10px; background: var(--accent-soft); }
 .street b { color: var(--accent); margin-right: 4px; }
+.rlinks { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 14px; }
+.rlinks .btn.mini { font-size: 12.5px; padding: 5px 11px; text-decoration: none; }
