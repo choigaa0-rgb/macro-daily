@@ -14,7 +14,7 @@ const PROMPT = `너는 한국 증권사 리서치센터의 기업 애널리스�
 원칙:
 1. 숫자(매출, 이익, 증가율, 시가총액, PER, PBR, 수익률, 주가)는 [데이터]에 있는 것만 쓴다. 새로 계산하거나 지어내지 않는다.
 2. 사업 구조·매출 구성·경쟁사는 공개된 일반 지식으로 써도 되지만, 그 부분은 "일반 정보"로 보고 구체적 수치(비중 %)를 만들지 않는다.
-3. 뉴스·공시는 주어진 목록만 근거로 쓴다.
+3. 뉴스·공시·증권사 리포트는 주어진 목록(제목)만 근거로 쓴다. 리포트 본문은 없으니 제목에 없는 내용을 지어내지 않는다.
 4. 투자 권유·목표주가·매수/매도 의견은 쓰지 않는다. BULL과 BEAR를 균형 있게 쓴다.
 5. 한국어, 짧은 문장. JSON 하나만 출력한다.
 출력:
@@ -26,6 +26,7 @@ const PROMPT = `너는 한국 증권사 리서치센터의 기업 애널리스�
   "results": "최근 실적 요약 2문장 (데이터 숫자만)",
   "valuation": "밸류에이션·주가 위치 해석 1~2문장 (데이터 숫자만)",
   "macro_link": "오늘 매크로·산업 이슈와의 연결 한 문장 (정보 없으면 빈 문자열)",
+  "street_view": "최근 증권사 리포트 제목들에 드러난 시각을 한 문장으로, 의견이 갈리면 갈린다고 (리포트 없으면 빈 문자열)",
   "bull": ["투자 포인트 1", "2", "3"],
   "bear": ["리스크 1", "2", "3"],
   "kill_scenario": "이 기업이 크게 무너지는 시나리오 한 문장",
@@ -65,8 +66,9 @@ async function gather(company, news) {
     try {
       const corp = await D.dartCorpCode(company.ticker.slice(0, 6));
       if (!corp) throw new Error('DART 기업코드를 찾지 못함');
-      const [f, disc, info] = await Promise.all([D.dartFinancials(corp.corp_code), D.dartDisclosures(corp.corp_code), D.dartCompany(corp.corp_code)]);
-      fin = f; filings = disc; out.profile = info;
+      const [f, disc, info, reps] = await Promise.all([D.dartFinancials(corp.corp_code), D.dartDisclosures(corp.corp_code), D.dartCompany(corp.corp_code),
+        D.brokerReports(company.ticker.slice(0, 6)).catch((e) => { errors.push(`증권사 리포트: ${e.message}`); return []; })]);
+      fin = f; filings = disc; out.profile = info; out.reports = reps; out.hiddenFilings = disc.hiddenRoutine || 0;
       if (f.annual) shares = await D.dartShares(corp.corp_code, f.annual.year).catch(() => null);
       out.source = 'DART';
     } catch (e) { errors.push(`DART: ${e.message}`); }
@@ -132,8 +134,8 @@ function verifyNumbers(card, data, attention) {
     nums(x.value).forEach((n) => pool.push(n));
   });
   if (attention) [attention.chg, attention.volx, attention.news, attention.score].forEach((v) => v != null && pool.push(Number(v)));
-  (data.news || []).concat(data.filings || []).forEach((n) => nums(n.title).forEach((v) => pool.push(v)));
-  const text = ['why_today', 'results', 'valuation', 'macro_link', 'kill_scenario'].map((k) => card[k] || '')
+  (data.news || []).concat(data.filings || [], data.reports || []).forEach((n) => nums(n.title).forEach((v) => pool.push(v)));
+  const text = ['why_today', 'results', 'valuation', 'macro_link', 'street_view', 'kill_scenario'].map((k) => card[k] || '')
     .concat(card.bull || [], card.bear || [], card.checkpoints || []).join(' ');
   const found = [];
   const re = /(-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?)\s*(%|배|조원|조|억원|억|원|달러|\$B|B|bp|만주|배수)/g;
@@ -152,6 +154,7 @@ function mailSection(c) {
   return `<h3 style="margin:20px 0 6px">오늘의 기업 · ${esc(c.data.company.name)} <span style="font-size:12px;color:#666">${esc(c.data.company.ticker)}</span></h3>
     <p style="margin:4px 0;font-weight:600">${esc(k.one_liner)}</p>
     <p style="margin:4px 0;font-size:13px"><b>오늘 주목 이유</b> ${esc(k.why_today)}</p>
+    ${k.street_view ? `<p style="margin:4px 0;font-size:13px"><b>증권사 시각</b> ${esc(k.street_view)}</p>` : ''}
     <p style="margin:4px 0;font-size:13px">${c.data.metrics.filter((m) => /매출|영업이익|PER|PBR|시가총액|1개월|연초/.test(m.label)).slice(0, 8).map((m) => `${esc(m.label)} <b>${esc(m.value)}</b>`).join(' · ')}</p>
     <table style="width:100%;border-collapse:separate;border-spacing:8px 0;font-size:13px"><tr>
       <td style="vertical-align:top;width:50%;padding:8px;border-top:3px solid #1e7a52;background:#fafafa"><b style="color:#1e7a52">BULL</b><ul style="margin:4px 0;padding-left:16px">${(k.bull || []).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></td>
@@ -188,6 +191,8 @@ async function buildCard({ ticker, auto }) {
 ${data.metrics.map((x) => `- ${x.label}: ${x.value}`).join('\n') || '(재무 데이터 없음)'}
 [관련 뉴스]
 ${data.news.map((n, i) => `${i + 1}. [${n.source}] ${n.title}`).join('\n') || '(없음)'}
+[최근 증권사 리포트 제목]
+${(data.reports || []).map((x) => `- ${x.date} ${x.broker}: ${x.title}`).join('\n') || '(없음)'}
 [최근 공시]
 ${data.filings.map((f) => `- ${f.date} ${f.title}`).join('\n') || '(없음)'}
 [오늘의 매크로·산업]

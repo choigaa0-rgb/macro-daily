@@ -1160,7 +1160,8 @@
           ${c.verify && c.verify.bad.length ? `AI 문장에 데이터에 없는 숫자가 있습니다: <b>${c.verify.bad.map(esc).join(', ')}</b> — 위 핵심 숫자와 비교해 확인하세요.` : 'AI 문장의 숫자가 모두 제공 데이터에서 확인됩니다.'}</p>
         <div class="co-2">
           <div><b>관련 뉴스</b>${c.data.news.length ? `<ul>${c.data.news.map((n) => `<li><a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a> <span class="muted">${esc(n.source)}</span></li>`).join('')}</ul>` : '<p class="muted">최근 기사 없음</p>'}</div>
-          <div><b>최근 공시</b>${c.data.filings.length ? `<ul>${c.data.filings.map((f) => `<li><a href="${esc(f.link)}" target="_blank" rel="noopener">${esc(f.title)}</a> <span class="muted">${esc(f.date)}</span></li>`).join('')}</ul>` : '<p class="muted">최근 공시 없음</p>'}</div>
+          <div>${c.data.company.market === 'KR' ? `<b>증권사 리포트</b>${k.street_view ? `<p class="street"><b>증권사 시각</b> ${esc(k.street_view)}</p>` : ''}${(c.data.reports || []).length ? `<ul>${c.data.reports.map((x) => `<li><a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title)}</a> <span class="muted">${esc(x.broker)} · ${esc(x.date)}${x.pdf ? ` · <a href="${esc(x.pdf)}" target="_blank" rel="noopener">PDF</a>` : ''}</span></li>`).join('')}</ul>` : '<p class="muted">최근 60일 리포트 없음</p>'}` : ''}
+            <b>최근 공시</b>${c.data.filings.length ? `<ul>${c.data.filings.map((f) => `<li><a href="${esc(f.link)}" target="_blank" rel="noopener">${esc(f.title)}</a> <span class="muted">${esc(f.date)}</span></li>`).join('')}</ul>` : '<p class="muted">최근 공시 없음</p>'}${c.data.hiddenFilings ? `<p class="muted small">임원·주요주주 지분 변동 보고 ${c.data.hiddenFilings}건은 숨겼어요.</p>` : ''}</div>
         </div>
       </div>` : ''}
 

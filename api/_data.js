@@ -263,13 +263,48 @@ async function dartShares(corp, year) {
   const row = j.list.find((x) => /보통/.test(x.se)) || j.list.find((x) => /합계/.test(x.se));
   return row ? num(row.distb_stock_co) || num(row.istc_totqy) : null;
 }
+// 최근 공시: 임원·주요주주 지분 보고(소유상황보고서, 대량보유)는 거의 매일 쌓여서 숨기고 개수만 알려줌
+const ROUTINE_DISC = /소유상황보고서|대량보유상황보고서/;
 async function dartDisclosures(corp) {
   const end = new Date(Date.now() + 9 * 3600000);
-  const bgn = new Date(end.getTime() - 45 * 86400000);
+  const bgn = new Date(end.getTime() - 60 * 86400000);
   const f = (d) => d.toISOString().slice(0, 10).replace(/-/g, '');
-  const j = await dartGet('list.json', { corp_code: corp, bgn_de: f(bgn), end_de: f(end), page_count: '15' });
+  const j = await dartGet('list.json', { corp_code: corp, bgn_de: f(bgn), end_de: f(end), page_count: '100' });
   if (j.status !== '000' || !j.list) return [];
-  return j.list.slice(0, 10).map((x) => ({ date: `${x.rcept_dt.slice(0, 4)}-${x.rcept_dt.slice(4, 6)}-${x.rcept_dt.slice(6, 8)}`, title: x.report_nm.trim(), link: `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${x.rcept_no}` }));
+  const all = j.list.map((x) => ({ date: `${x.rcept_dt.slice(0, 4)}-${x.rcept_dt.slice(4, 6)}-${x.rcept_dt.slice(6, 8)}`, title: x.report_nm.replace(/\s+/g, ' ').trim(), link: `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${x.rcept_no}` }));
+  const main = all.filter((x) => !ROUTINE_DISC.test(x.title)).slice(0, 8);
+  main.hiddenRoutine = all.filter((x) => ROUTINE_DISC.test(x.title)).length;
+  return main;
+}
+
+// ---------- 증권사 리포트 (네이버 증권 리서치 · 종목분석) ----------
+// 제목·증권사·날짜·링크만 씀 (리포트 본문은 가져오지 않음). 한국 종목만.
+function parseNaverReports(html, days = 60) {
+  const out = [];
+  const cutoff = new Date(Date.now() + 9 * 3600000 - days * 86400000).toISOString().slice(2, 10).replace(/-/g, '.');
+  const strip = (x) => String(x).replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
+  for (const row of String(html).split(/<tr[\s>]/i)) {
+    const a = row.match(/href="([^"]*company_read\.naver\?[^"]*nid=(\d+)[^"]*)"[^>]*>([\s\S]*?)<\/a>/i);
+    if (!a) continue;
+    const cells = row.split(/<\/td>/i).map(strip);
+    const date = (row.match(/\b(\d{2}\.\d{2}\.\d{2})\b/) || [])[1];
+    if (!date || date < cutoff) continue;
+    const ti = cells.findIndex((c) => c.includes(strip(a[3])));
+    const broker = (cells[ti + 1] || '').replace(/\s/g, '') || '';
+    const pdf = (row.match(/href="(https?:[^"]+\.pdf)"/i) || [])[1] || '';
+    out.push({ date: `20${date.replace(/\./g, '-')}`, title: strip(a[3]), broker, link: `https://finance.naver.com/research/company_read.naver?nid=${a[2]}`, pdf });
+    if (out.length >= 6) break;
+  }
+  return out;
+}
+async function brokerReports(stockCode) {
+  const r = await fetchWithTimeout(`https://finance.naver.com/research/company_list.naver?searchType=itemCode&itemCode=${stockCode}&page=1`,
+    { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36', Referer: 'https://finance.naver.com/research/' } }, 7000);
+  if (!r.ok) throw new Error(`네이버 리서치 ${r.status}`);
+  const buf = Buffer.from(await r.arrayBuffer());
+  let html;
+  try { html = new TextDecoder('euc-kr').decode(buf); } catch (e) { html = buf.toString('utf8'); }
+  return parseNaverReports(html);
 }
 async function dartCompany(corp) {
   const j = await dartGet('company.json', { corp_code: corp });
@@ -348,4 +383,4 @@ async function secFilings(cik) {
   return out;
 }
 
-module.exports = { UNIVERSE, FEEDS, parseRss, fetchNews, newsFor, yahooChart, rankAttention, priceStats, unzipFirst, dartCorpCode, dartFinancials, dartShares, dartDisclosures, dartCompany, secCik, secFinancials, secFilings, annualPair, pickAccounts };
+module.exports = { UNIVERSE, FEEDS, parseRss, fetchNews, newsFor, yahooChart, rankAttention, priceStats, unzipFirst, dartCorpCode, dartFinancials, dartShares, dartDisclosures, dartCompany, brokerReports, parseNaverReports, secCik, secFinancials, secFilings, annualPair, pickAccounts };

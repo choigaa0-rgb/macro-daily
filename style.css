@@ -1026,3 +1026,5 @@ html.themed .co-mini-name { color: var(--t-accent); }
 .issue .issue-t { margin-top: 10px; }
 #industryPanel > .ind-filter { align-self: start; width: max-content; }
 .ind-filter button { white-space: nowrap; padding: 6px 14px; }
+.street { font-size: 13.5px; margin: 6px 0 4px; padding: 8px 10px; border-radius: 10px; background: var(--accent-soft); }
+.street b { color: var(--accent); margin-right: 4px; }
