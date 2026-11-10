@@ -1114,15 +1114,81 @@
     state.companyBusy = null; renderCompany(); renderBrief();
   }
   // 증권사 리포트는 자동으로 가져오지 않고, 직접 확인할 링크만 (네이버·한경 리서치는 화면을 브라우저에서 그려서 서버가 읽을 수 없음)
+
+  // ---------- 기업 카드 (섹션별 카드로 나눠 배치) ----------
+  function metricGroups(metrics) {
+    // PER 이름에 '순이익'이 들어가므로 밸류에이션을 먼저 판별
+    const groupOf = (m) => (/시가총액|PER|PBR/.test(m.label) ? '밸류에이션' : /매출|영업이익|순이익/.test(m.label) ? '실적' : /주가|수익률|연초|52주/.test(m.label) ? '주가' : '기타');
+    return ['실적', '밸류에이션', '주가', '기타'].map((g) => [g, metrics.filter((m) => groupOf(m) === g)]).filter(([, it]) => it.length);
+  }
+  function metricCell(m) {
+    const v = String(m.value);
+    const tone = /수익률|대비|증가율|전년비/.test(m.label) && /^-?\d/.test(v) ? (v.startsWith('-') ? 'down' : 'up') : '';
+    const label = m.label.replace(/\s*\((간이[^)]*)\)/, '<small>$1</small>');
+    return `<div class="mt"><div class="mt-l">${label}</div><div class="mt-v ${tone}">${esc(v)}</div></div>`;
+  }
+  function companyCardHtml(c, k, list) {
+    const co = c.data.company, kr = co.market === 'KR';
+    const v = c.verify || { ok: 0, total: 0, bad: [] };
+    const news = c.data.news || [], filings = c.data.filings || [];
+    return `<div class="co-wrap" id="companyCard">
+      <section class="card co-head">
+        <div class="co-top">
+          <div><div class="co-name">${esc(co.name)}</div>
+            <div class="co-tags"><span class="tag">${esc(co.ticker)}</span><span class="tag">${kr ? '한국' : '미국'}</span>${c.data.source ? `<span class="tag">${esc(c.data.source)} 재무</span>` : ''}</div></div>
+          <div class="co-badges"><span class="badge ${v.bad.length ? 'warn' : 'good'}" title="AI 문장 속 숫자가 데이터에 있는지">숫자 검증 ${v.ok}/${v.total}</span><span class="ai-warn">AI 분석 · 투자 권유 아님</span></div>
+        </div>
+        ${k.one_liner ? `<p class="co-one">${esc(k.one_liner)}</p>` : ''}
+        ${k.why_today ? `<p class="co-why"><b>오늘 주목받는 이유</b>${esc(k.why_today)}</p>` : ''}
+        ${v.bad.length ? `<p class="co-alert">AI 문장에 데이터에 없는 숫자가 있어요: <b>${v.bad.map(esc).join(', ')}</b> — 아래 핵심 숫자와 비교해 확인하세요.</p>` : ''}
+        ${c.data.errors && c.data.errors.length ? `<p class="muted small">일부 데이터를 가져오지 못했습니다: ${esc(c.data.errors.join(' · '))}</p>` : ''}
+      </section>
+
+      <section class="card">
+        <h2>핵심 숫자 <span class="muted">${esc(c.data.source || '')}·Yahoo에서 직접 계산</span></h2>
+        ${c.data.metrics.length ? metricGroups(c.data.metrics).map(([g, it]) => `<div class="mt-group"><div class="mt-gname">${g}</div><div class="mt-grid">${it.map(metricCell).join('')}</div></div>`).join('') : '<p class="muted">재무 데이터 없음</p>'}
+      </section>
+
+      <div class="co-2col">
+        <section class="card"><h2>무엇으로 돈을 버나</h2>
+          <p>${esc(k.business || '')}</p>
+          ${k.segments && k.segments.length ? `<div class="kv"><span>주요 사업</span><div>${k.segments.map((x) => `<span class="chip">${esc(x)}</span>`).join(' ')}</div></div>` : ''}
+          ${k.competitors && k.competitors.length ? `<div class="kv"><span>경쟁사</span><div>${k.competitors.map((x) => `<span class="chip">${esc(x)}</span>`).join(' ')}</div></div>` : ''}
+          <p class="muted small">사업 구조·경쟁사는 AI의 일반 정보예요. 사업보고서로 확인하세요.</p></section>
+        <section class="card"><h2>실적과 밸류에이션</h2>
+          <p>${esc(k.results || '')}</p><p>${esc(k.valuation || '')}</p>
+          ${k.macro_link ? `<p class="macro-l"><b>매크로·산업 연결</b> ${esc(k.macro_link)}</p>` : ''}</section>
+      </div>
+
+      <section class="card"><h2>투자 논리 <span class="muted">BULL과 BEAR를 같이 보기</span></h2>
+        <div class="bb2"><div class="bull-box"><b class="t-bull">BULL · 투자 포인트</b>${list(k.bull)}</div><div class="bear-box"><b class="t-bear">BEAR · 리스크</b>${list(k.bear)}</div></div>
+        ${k.kill_scenario ? `<p class="kill"><b>망하는 시나리오</b> ${esc(k.kill_scenario)}</p>` : ''}
+        ${k.checkpoints && k.checkpoints.length ? `<div class="kv"><span>체크포인트</span><div>${list(k.checkpoints)}</div></div>` : ''}
+      </section>
+
+      <section class="card"><h2>증권사 시각과 비교 <span class="muted">교차검증</span></h2>
+        ${reportBlock(c, k) || '<p class="muted small">미국 종목은 증권사 리포트를 자동으로 가져오지 않아요. 아래 링크에서 확인하세요.</p>'}
+        <div class="rl-foot">${researchLinks(co)}</div>
+      </section>
+
+      <div class="co-2col">
+        <section class="card"><h2>관련 뉴스 <span class="muted">${news.length}건</span></h2>
+          ${news.length ? `<ul class="link-list">${news.map((n) => `<li><a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a><span class="muted">${esc(n.source)}</span></li>`).join('')}</ul>` : '<p class="muted">최근 기사 없음</p>'}</section>
+        <section class="card"><h2>최근 공시 <span class="muted">${filings.length}건</span></h2>
+          ${filings.length ? `<ul class="link-list">${filings.map((f) => `<li><a href="${esc(f.link)}" target="_blank" rel="noopener">${esc(f.title)}</a><span class="muted">${esc(f.date)}</span></li>`).join('')}</ul>` : '<p class="muted">최근 공시 없음</p>'}
+          ${c.data.hiddenFilings ? `<p class="muted small">임원·주요주주 지분 변동 보고 ${c.data.hiddenFilings}건은 숨겼어요.</p>` : ''}</section>
+      </div>
+    </div>`;
+  }
   function reportBlock(c, k) {
     if (c.data.company.market !== 'KR' || !c.data.reports) return '';
     const R = c.data.reports, S0 = c.data.reportSummary;
     const won = (v) => `${Math.round(v).toLocaleString('ko-KR')}원`;
     const ops = S0 ? Object.entries(S0.opinions).map(([o, n]) => `${o} ${n}`).join(' · ') : '';
-    return `<b>증권사 리포트</b> <span class="muted small">최근 90일 · 증권사 의견 (우리 의견 아님)</span>
+    return `<p class="muted small">네이버 증권 리서치 최근 90일 · 증권사 의견이며 우리 의견이 아니에요.</p>
       ${S0 ? `<p class="street">목표주가 ${S0.n}건${S0.from ? ` (${esc(S0.from.slice(5))}~${esc(S0.to.slice(5))} 발표)` : ''}: ${won(S0.min)}~${won(S0.max)}, 중간값 ${won(S0.median)}${S0.gap != null ? ` (현재가 대비 ${S0.gap > 0 ? '+' : ''}${S0.gap}%)` : ''}${ops ? `<br>투자의견 ${esc(ops)}` : ''}</p>` : ''}
       ${k.street_view ? `<p class="street"><b>증권사 시각</b> ${esc(k.street_view)}</p>` : ''}
-      ${R.length ? `<ul>${R.map((x) => `<li><a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title)}</a> <span class="muted">${esc(x.broker)} · ${esc(x.date)}${x.goal ? ` · ${won(x.goal)}` : ''}${x.opinion ? ` · ${esc(x.opinion)}` : ''}</span></li>`).join('')}</ul>` : '<p class="muted">최근 90일 리포트 없음</p>'}`;
+      ${R.length ? `<table class="rep-tbl"><thead><tr><th>날짜</th><th>증권사</th><th>제목</th><th class="r">목표주가</th><th>의견</th></tr></thead><tbody>${R.map((x) => `<tr><td class="muted">${esc(x.date.slice(5))}</td><td>${esc(x.broker)}</td><td><a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title)}</a></td><td class="r">${x.goal ? won(x.goal) : '-'}</td><td>${esc(x.opinion || '-')}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">최근 90일 리포트 없음</p>'}`;
   }
   function researchLinks(co) {
     const kr = co.market === 'KR';
@@ -1130,8 +1196,7 @@
     const links = kr
       ? [['네이버 증권 리서치', `https://stock.naver.com/research/company?searchText=${encodeURIComponent(co.name)}`], ['네이버 종목 (컨센서스)', `https://finance.naver.com/item/coinfo.naver?code=${code}`], ['한경컨센서스', 'https://markets.hankyung.com/consensus']]
       : [['Finviz (애널리스트 의견·목표가)', `https://finviz.com/quote.ashx?t=${encodeURIComponent(co.ticker)}`], ['Yahoo Finance 애널리스트', `https://finance.yahoo.com/quote/${encodeURIComponent(co.ticker)}/analysis`]];
-    return `<b>${co.market === 'KR' ? '리포트 원문 보기' : '증권사 의견 확인'}</b><p class="muted small">AI 분석과 증권사 시각이 같은지 직접 비교해 보세요.${kr ? ' 한경컨센서스에서는 종목명으로 검색하세요.' : ''}</p>
-      <div class="rlinks">${links.map(([l, u]) => `<a class="btn mini" href="${esc(u)}" target="_blank" rel="noopener">${esc(l)}</a>`).join('')}</div>`;
+    return `<div class="rlinks"><span class="muted small">원문 보기${kr ? ' (한경컨센서스는 종목명으로 검색)' : ''}</span>${links.map(([l, u]) => `<a class="btn mini" href="${esc(u)}" target="_blank" rel="noopener">${esc(l)}</a>`).join('')}</div>`;
   }
   function renderCompany() {
     const box = $('#companyPanel');
@@ -1148,42 +1213,17 @@
         <div class="muted">${c ? `${esc(c.reason)} · ${esc(c.model || '')}` : esc(state.companyMsg || '불러오는 중…')}</div></div>
         <div class="rec-actions"><button class="btn" data-act="load-rank" type="button" ${state.rankBusy ? 'disabled' : ''}>${state.rankBusy ? '계산 중…' : '주목도 상위 20 보기'}</button>
         <button class="btn primary" data-act="make-company" type="button" ${busy ? 'disabled' : ''}>${busy === 'auto' ? '분석 중… (최대 1분)' : c ? '자동 선정으로 다시 만들기' : '자동 선정해서 분석'}</button></div></div>
-        <p class="hint">한국·미국 대형주 후보군에서 <b>평소 대비 주가 변동 + 거래량 증가 + 뉴스 언급</b>으로 주목도를 매겨 1위(최근 2주 분석 종목 제외, 오늘 산업 이슈에 나오면 가산)를 분석합니다. 숫자는 DART·SEC·Yahoo에서 직접 계산하고 AI는 그 숫자로 해석합니다. <b>투자 권유가 아닌 분석 카드</b>입니다.</p>
+        <p class="hint">주가 변동·거래량·뉴스 언급으로 고른 오늘 가장 주목받는 기업 1곳. 숫자는 DART·SEC·Yahoo에서 직접 계산하고 AI는 해석만 합니다. 투자 권유가 아닌 분석 카드예요.</p>
       </div>
 
-      ${R ? `<div class="card"><h2>주목도 상위 20 <span class="muted">${esc((R.rank[0] || {}).date || '')} 종가 기준 · 눌러서 분석</span></h2>
+      ${c ? companyCardHtml(c, k, list) : ''}
+
+      ${R ? `<details class="card rank-box" ${c ? '' : 'open'}><summary><h2>주목도 상위 20 <span class="muted">${esc((R.rank[0] || {}).date || '')} 종가 기준 · 다른 기업도 눌러서 분석</span></h2></summary>
         <table class="rec rank"><thead><tr><th>#</th><th>기업</th><th>1일</th><th>변동/평소</th><th>거래량 배수</th><th>뉴스</th><th>점수</th><th></th></tr></thead><tbody>
         ${R.rank.map((x, i) => `<tr class="${R.pick && R.pick.ticker === x.ticker ? 'pick' : ''}"><td class="mono">${i + 1}</td><td><b>${esc(x.name)}</b> <span class="muted mono">${esc(x.ticker)}</span>${R.recent.includes(x.ticker) ? ' <span class="muted">(최근 분석)</span>' : ''}${x.bonus ? ' <span class="chip info">산업 이슈</span>' : ''}</td>
           <td class="mono ${x.chg > 0 ? 'up' : x.chg < 0 ? 'down' : ''}">${signed(x.chg, 2, '%')}</td><td class="mono">${x.move}배</td><td class="mono">${x.volx}배</td><td class="mono">${x.news}</td><td class="mono"><b>${x.score}</b></td>
           <td><button class="btn mini" data-act="analyze" data-val="${esc(x.ticker)}" type="button" ${busy ? 'disabled' : ''}>${busy === x.ticker ? '분석 중…' : '분석'}</button></td></tr>`).join('')}</tbody></table>
-        <div class="pick-row"><span class="muted">후보군 밖 종목:</span> <input type="text" id="customTicker" placeholder="예: 005490.KS 또는 AAPL" /> <button class="btn mini" data-act="analyze-custom" type="button" ${busy ? 'disabled' : ''}>분석</button></div></div>` : ''}
-
-      ${c ? `<div class="card company-card" id="companyCard">
-        <div class="wk-head"><div><div class="co-name">${esc(c.data.company.name)} <span class="muted mono">${esc(c.data.company.ticker)} · ${c.data.company.market === 'KR' ? '한국' : '미국'}</span></div>
-          <p class="headline">${esc(k.one_liner || '')}</p></div><span class="ai-warn">AI 분석 · 투자 권유 아님</span></div>
-        ${k.why_today ? `<p><b>오늘 주목받는 이유</b> ${esc(k.why_today)}</p>` : ''}
-        <h3>핵심 숫자 <span class="muted">${esc(c.data.source || '')}·Yahoo에서 직접 계산 · PER·PBR은 간이 계산</span></h3>
-        <div class="metric-grid">${c.data.metrics.map((m) => `<div class="metric"><div class="muted">${esc(m.label)}</div><div class="mono"><b>${esc(m.value)}</b></div></div>`).join('') || '<p class="muted">재무 데이터 없음</p>'}</div>
-        ${c.data.errors && c.data.errors.length ? `<p class="muted">일부 데이터를 가져오지 못했습니다: ${esc(c.data.errors.join(' · '))}</p>` : ''}
-        <div class="co-2">
-          <div><h3>무엇으로 돈을 버나</h3><p>${esc(k.business || '')}</p>
-            ${k.segments && k.segments.length ? `<p><b>주요 사업</b> ${k.segments.map(esc).join(' · ')}</p>` : ''}
-            ${k.competitors && k.competitors.length ? `<p><b>경쟁사</b> ${k.competitors.map(esc).join(' · ')}</p>` : ''}
-            <p class="muted">사업 구조·경쟁사는 AI의 일반 정보입니다. 사업보고서로 확인하세요.</p></div>
-          <div><h3>실적과 밸류에이션</h3><p>${esc(k.results || '')}</p><p>${esc(k.valuation || '')}</p>${k.macro_link ? `<p class="macro-l"><b>매크로·산업 연결</b> ${esc(k.macro_link)}</p>` : ''}</div>
-        </div>
-        <div class="bb2"><div class="bull-box"><b class="t-bull">BULL · 투자 포인트</b>${list(k.bull)}</div><div class="bear-box"><b class="t-bear">BEAR · 리스크</b>${list(k.bear)}</div></div>
-        ${k.kill_scenario ? `<p class="kill"><b>망하는 시나리오</b> ${esc(k.kill_scenario)}</p>` : ''}
-        ${k.checkpoints && k.checkpoints.length ? `<h3>체크포인트</h3>${list(k.checkpoints)}` : ''}
-        <h3>교차검증</h3>
-        <p><span class="badge ${c.verify && c.verify.bad.length ? 'warn' : 'good'}">숫자 근거 ${c.verify ? `${c.verify.ok}/${c.verify.total}` : '-'}</span>
-          ${c.verify && c.verify.bad.length ? `AI 문장에 데이터에 없는 숫자가 있습니다: <b>${c.verify.bad.map(esc).join(', ')}</b> — 위 핵심 숫자와 비교해 확인하세요.` : 'AI 문장의 숫자가 모두 제공 데이터에서 확인됩니다.'}</p>
-        <div class="co-2">
-          <div><b>관련 뉴스</b>${c.data.news.length ? `<ul>${c.data.news.map((n) => `<li><a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a> <span class="muted">${esc(n.source)}</span></li>`).join('')}</ul>` : '<p class="muted">최근 기사 없음</p>'}</div>
-          <div>${reportBlock(c, k)}${researchLinks(c.data.company)}
-            <b>최근 공시</b>${c.data.filings.length ? `<ul>${c.data.filings.map((f) => `<li><a href="${esc(f.link)}" target="_blank" rel="noopener">${esc(f.title)}</a> <span class="muted">${esc(f.date)}</span></li>`).join('')}</ul>` : '<p class="muted">최근 공시 없음</p>'}${c.data.hiddenFilings ? `<p class="muted small">임원·주요주주 지분 변동 보고 ${c.data.hiddenFilings}건은 숨겼어요.</p>` : ''}</div>
-        </div>
-      </div>` : ''}
+        <div class="pick-row"><span class="muted">후보군 밖 종목:</span> <input type="text" id="customTicker" placeholder="예: 005490.KS 또는 AAPL" /> <button class="btn mini" data-act="analyze-custom" type="button" ${busy ? 'disabled' : ''}>분석</button></div></details>` : ''}
 
       ${past.length ? `<div class="card"><h2>지난 기업 카드 <span class="muted">면접 준비 자료로 쌓입니다</span></h2>
         <table class="rec"><thead><tr><th>날짜</th><th>기업</th><th>한 줄 요약</th><th>숫자 검증</th></tr></thead><tbody>

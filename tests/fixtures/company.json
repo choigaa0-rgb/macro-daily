@@ -1,191 +1,248 @@
 {
-  "date": "2026-11-09",
-  "reason": "주목도 1위",
-  "attention": {
-    "ticker": "005930.KS",
-    "name": "삼성전자",
-    "market": "KR",
-    "date": "2026-11-08",
-    "close": 74200,
-    "chg": 5.98,
-    "move": 87.86,
-    "volx": 5,
-    "news": 1,
-    "bonus": 0,
-    "score": 7.5
+ "date": "2026-11-09",
+ "reason": "주목도 1위",
+ "attention": {
+  "ticker": "005930.KS",
+  "name": "삼성전자",
+  "market": "KR",
+  "date": "2026-11-08",
+  "close": 74200,
+  "chg": 5.98,
+  "move": 87.86,
+  "volx": 5,
+  "news": 1,
+  "bonus": 0,
+  "score": 7.5
+ },
+ "data": {
+  "company": {
+   "ticker": "005930.KS",
+   "name": "삼성전자",
+   "market": "KR"
   },
-  "data": {
-    "company": {
-      "ticker": "005930.KS",
-      "name": "삼성전자",
-      "market": "KR"
-    },
-    "price": {
-      "date": "2026-11-08",
-      "close": 74200,
-      "chg1d": 5.98,
-      "ret1m": 5.9,
-      "ret3m": 6.06,
-      "retYtd": 6,
-      "high52": 74200,
-      "low52": 69930,
-      "fromHigh": 0
-    },
-    "currency": "KRW",
-    "news": [
-      {
-        "source": "연합뉴스 경제",
-        "title": "삼성전자, HBM4 엔비디아 공급 확대",
-        "link": "https://n.test/1"
-      }
-    ],
-    "profile": {
-      "name": "삼성전자",
-      "ceo": "대표이사"
-    },
-    "source": "DART",
-    "filings": [
-      {
-        "date": "2026-11-05",
-        "title": "분기보고서 (2026.09)",
-        "link": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261105000001"
-      }
-    ],
-    "metrics": [
-      {
-        "label": "2025 매출",
-        "value": "300조원",
-        "raw": 300000000000000
-      },
-      {
-        "label": "2025 매출 증가율",
-        "value": "15.4%",
-        "raw": 15.4
-      },
-      {
-        "label": "2025 영업이익",
-        "value": "35조원",
-        "raw": 35000000000000
-      },
-      {
-        "label": "2025 영업이익 증가율",
-        "value": "438.5%",
-        "raw": 438.5
-      },
-      {
-        "label": "2025 영업이익률",
-        "value": "11.7%",
-        "raw": 11.7
-      },
-      {
-        "label": "2025 순이익",
-        "value": "34조원",
-        "raw": 34000000000000
-      },
-      {
-        "label": "2026 3분기 누적 매출",
-        "value": "230조원",
-        "raw": 230000000000000
-      },
-      {
-        "label": "3분기 누적 매출 전년비",
-        "value": "15%",
-        "raw": 15
-      },
-      {
-        "label": "2026 3분기 누적 영업이익",
-        "value": "30조원",
-        "raw": 30000000000000
-      },
-      {
-        "label": "3분기 누적 영업이익 전년비",
-        "value": "20%",
-        "raw": 20
-      },
-      {
-        "label": "시가총액 (간이)",
-        "value": "437.8조원",
-        "raw": 437780000000000
-      },
-      {
-        "label": "PER (간이, 최근 연간 순이익)",
-        "value": "12.9배",
-        "raw": 12.9
-      },
-      {
-        "label": "PBR (간이, 최근 자본총계)",
-        "value": "1.1배",
-        "raw": 1.1
-      },
-      {
-        "label": "주가",
-        "value": "74,200원",
-        "raw": 74200
-      },
-      {
-        "label": "1일 수익률",
-        "value": "5.98%",
-        "raw": 5.98
-      },
-      {
-        "label": "1개월 수익률",
-        "value": "5.9%",
-        "raw": 5.9
-      },
-      {
-        "label": "3개월 수익률",
-        "value": "6.06%",
-        "raw": 6.06
-      },
-      {
-        "label": "연초 대비",
-        "value": "6%",
-        "raw": 6
-      },
-      {
-        "label": "52주 고점 대비",
-        "value": "0%",
-        "raw": 0
-      },
-      {
-        "label": "52주 범위",
-        "value": "69,930~74,200원",
-        "raw": null
-      }
-    ],
-    "errors": []
+  "price": {
+   "date": "2026-11-08",
+   "close": 74200,
+   "chg1d": 5.98,
+   "ret1m": 5.9,
+   "ret3m": 6.06,
+   "retYtd": 6,
+   "high52": 74200,
+   "low52": 69930,
+   "fromHigh": 0
   },
-  "card": {
-    "one_liner": "메모리 반도체 1위",
-    "why_today": "1일 6% 상승, 거래량 5배",
-    "business": "b",
-    "segments": [
-      "메모리"
-    ],
-    "competitors": [
-      "SK하이닉스"
-    ],
-    "results": "2025 매출 300조원, 영업이익 증가율 438.5%",
-    "valuation": "PER 12.1배, PBR 1.0배 수준이며 영업이익률 25%",
-    "macro_link": "",
-    "bull": [
-      "HBM"
-    ],
-    "bear": [
-      "가격"
-    ],
-    "kill_scenario": "k",
-    "checkpoints": [
-      "실적"
-    ]
+  "currency": "KRW",
+  "news": [
+   {
+    "source": "연합뉴스 경제",
+    "title": "삼성전자, HBM4 엔비디아 공급 확대",
+    "link": "https://n.test/1"
+   }
+  ],
+  "profile": {
+   "name": "삼성전자",
+   "ceo": "대표이사"
   },
-  "verify": {
-    "total": 7,
-    "bad": [
-      "12.1배",
-      "25%"
-    ],
-    "ok": 5
+  "source": "DART",
+  "filings": [
+   {
+    "date": "2026-11-05",
+    "title": "분기보고서 (2026.09)",
+    "link": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261105000001"
+   }
+  ],
+  "metrics": [
+   {
+    "label": "2025 매출",
+    "value": "300조원",
+    "raw": 300000000000000
+   },
+   {
+    "label": "2025 매출 증가율",
+    "value": "15.4%",
+    "raw": 15.4
+   },
+   {
+    "label": "2025 영업이익",
+    "value": "35조원",
+    "raw": 35000000000000
+   },
+   {
+    "label": "2025 영업이익 증가율",
+    "value": "438.5%",
+    "raw": 438.5
+   },
+   {
+    "label": "2025 영업이익률",
+    "value": "11.7%",
+    "raw": 11.7
+   },
+   {
+    "label": "2025 순이익",
+    "value": "34조원",
+    "raw": 34000000000000
+   },
+   {
+    "label": "2026 3분기 누적 매출",
+    "value": "230조원",
+    "raw": 230000000000000
+   },
+   {
+    "label": "3분기 누적 매출 전년비",
+    "value": "15%",
+    "raw": 15
+   },
+   {
+    "label": "2026 3분기 누적 영업이익",
+    "value": "30조원",
+    "raw": 30000000000000
+   },
+   {
+    "label": "3분기 누적 영업이익 전년비",
+    "value": "20%",
+    "raw": 20
+   },
+   {
+    "label": "시가총액 (간이)",
+    "value": "437.8조원",
+    "raw": 437780000000000
+   },
+   {
+    "label": "PER (간이, 최근 연간 순이익)",
+    "value": "12.9배",
+    "raw": 12.9
+   },
+   {
+    "label": "PBR (간이, 최근 자본총계)",
+    "value": "1.1배",
+    "raw": 1.1
+   },
+   {
+    "label": "주가",
+    "value": "74,200원",
+    "raw": 74200
+   },
+   {
+    "label": "1일 수익률",
+    "value": "5.98%",
+    "raw": 5.98
+   },
+   {
+    "label": "1개월 수익률",
+    "value": "5.9%",
+    "raw": 5.9
+   },
+   {
+    "label": "3개월 수익률",
+    "value": "6.06%",
+    "raw": 6.06
+   },
+   {
+    "label": "연초 대비",
+    "value": "6%",
+    "raw": 6
+   },
+   {
+    "label": "52주 고점 대비",
+    "value": "0%",
+    "raw": 0
+   },
+   {
+    "label": "52주 범위",
+    "value": "69,930~74,200원",
+    "raw": null
+   }
+  ],
+  "errors": [],
+  "reports": [
+   {
+    "date": "2026-10-30",
+    "broker": "교보증권",
+    "title": "3Q26 Review 사상 최대 실적, 메모리가 이끌었다",
+    "goal": 500000,
+    "opinion": "Buy",
+    "link": "https://stock.naver.com/research/company/1"
+   },
+   {
+    "date": "2026-10-30",
+    "broker": "하나증권",
+    "title": "2027년 영업이익 전망치 상향으로 방향 전환",
+    "goal": 480000,
+    "opinion": "Buy",
+    "link": "https://stock.naver.com/research/company/1"
+   },
+   {
+    "date": "2026-10-12",
+    "broker": "DS투자증권",
+    "title": "사상 최초 DRAM 분기 매출 100조원 상회",
+    "goal": 530000,
+    "opinion": "매수",
+    "link": "https://stock.naver.com/research/company/1"
+   },
+   {
+    "date": "2026-10-12",
+    "broker": "유진투자증권",
+    "title": "눈높이를 높이는 구간",
+    "goal": 560000,
+    "opinion": "StrongBuy",
+    "link": "https://stock.naver.com/research/company/1"
+   },
+   {
+    "date": "2026-10-07",
+    "broker": "한화투자증권",
+    "title": "주인공은 HBM으로 바뀐다",
+    "goal": 580000,
+    "opinion": "Buy",
+    "link": "https://stock.naver.com/research/company/1"
+   }
+  ],
+  "reportSummary": {
+   "n": 5,
+   "from": "2026-10-07",
+   "to": "2026-10-30",
+   "min": 480000,
+   "max": 580000,
+   "median": 530000,
+   "gap": 165.5,
+   "opinions": {
+    "매수": 4,
+    "강력매수": 1
+   }
   },
-  "model": "gemini-3.8-flash"
+  "hiddenFilings": 28
+ },
+ "card": {
+  "one_liner": "메모리 반도체 1위",
+  "why_today": "1일 6% 상승, 거래량 5배",
+  "business": "b",
+  "segments": [
+   "메모리"
+  ],
+  "competitors": [
+   "SK하이닉스"
+  ],
+  "results": "2025 매출 300조원, 영업이익 증가율 438.5%",
+  "valuation": "PER 12.1배, PBR 1.0배 수준이며 영업이익률 25%",
+  "macro_link": "",
+  "bull": [
+   "HBM"
+  ],
+  "bear": [
+   "가격"
+  ],
+  "kill_scenario": "k",
+  "checkpoints": [
+   "실적"
+  ],
+  "street_view": "증권사들은 3분기 사상 최대 실적과 메모리 호황을 근거로 매수 의견을 유지하지만, 목표가는 모두 최근 주가 급락 이전에 나왔다."
+ },
+ "verify": {
+  "total": 7,
+  "bad": [
+   "12.1배",
+   "25%"
+  ],
+  "ok": 5
+ },
+ "model": "gemini-3.8-flash"
 }
