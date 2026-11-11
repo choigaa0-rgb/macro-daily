@@ -862,6 +862,25 @@
   function gotoTab(name) { showView(name); }
 
 
+  // ---------- 주요 일정 + 영향 지도 (calendar.js) ----------
+  function calendarCard() {
+    const K = window.Calendar;
+    if (!K) return '';
+    const now = Date.now();
+    let list = K.upcoming(now, 14);
+    if (list.filter((e) => !e.past).length < 3) {
+      const next = K.all().filter((e) => e.utc > now).slice(0, 3);
+      list = list.filter((e) => e.past).concat(next.map((e) => Object.assign({}, e, { past: false, dday: Math.round((Date.parse(e.kstDate) - Date.parse(K.kstParts(now).date)) / 86400000) })));
+      list = list.filter((e, i, a) => a.findIndex((x) => x.type === e.type && x.utc === e.utc) === i);
+    }
+    const dd = (e) => (e.past ? '<span class="badge neutral">발표됨</span>' : e.dday === 0 ? '<span class="badge bad">오늘</span>' : e.dday === 1 ? '<span class="badge warn">내일</span>' : `<span class="badge info">D-${e.dday}</span>`);
+    const rows = list.map((e) => `<details class="cal-row${e.past ? ' past' : ''}"><summary>${dd(e)}<span class="cal-when">${esc(e.kstDate.slice(5).replace('-', '/'))}(${esc(e.dow)}) ${esc(e.kstTime)}</span><span class="cal-name">${esc(e.name)}</span><span class="ind-tag">${esc(e.country)}</span>${e.past ? '<a href="#" class="cal-go" data-act="goto-event">이벤트일 점검 →</a>' : ''}</summary>
+        <table class="g-table cal-imp"><tr><th>볼 것</th><td>${esc(e.impact.watch)}</td></tr><tr><th class="up">예상보다 높게·매파적</th><td>${esc(e.impact.hot)}</td></tr><tr><th class="down">예상보다 낮게·비둘기파적</th><td>${esc(e.impact.cool)}</td></tr></table></details>`).join('');
+    return `<section class="card span-12"><div class="wk-head"><h2>주요 일정 <span class="muted">한국시간 · 2주</span></h2><a href="https://kr.investing.com/economic-calendar/" target="_blank" rel="noopener">전체 경제 캘린더 ↗</a></div>
+      ${rows || '<p class="muted">2주 안에 등록된 일정이 없습니다.</p>'}
+      <p class="muted small">공식 발표 일정(연준·BLS·BEA·한국은행) 기준. 줄을 누르면 결과별 1차 반응을 볼 수 있어요. 실제 반응은 그날 시장의 관심사에 따라 달라집니다.${K.lastDate() < new Date(now + 60 * 86400000).toISOString().slice(0, 10) ? ' ⚠ 등록된 일정이 곧 끝나요. calendar.js에 다음 해 일정을 추가해 주세요.' : ''}</p></section>`;
+  }
+
   // ---------- 오늘의 브리핑 (읽기 중심 + 교차검증) ----------
   const CONCL_ROWS = ['오늘의 동인', '이야기', '한국 영향', '국면 판단', '뷰 변화', '다음 체크포인트', '투자 시사점'];
   function aiConclText() {
@@ -1005,6 +1024,8 @@
           <h2>자동 신호 <span class="muted">규칙 기반</span></h2>
           ${sigRows ? `<ul class="sig-list">${sigRows}</ul>` : '<p class="muted">데이터를 불러오면 나옵니다.</p>'}
         </section>
+
+        ${calendarCard()}
 
         ${b ? `<section class="card span-7">
           <h2>결론 세부</h2>
@@ -1376,6 +1397,10 @@
       <div class="card">
         <h2>이벤트일 심화 점검</h2>
         <p class="hint">시장 기대 vs 실제 결과의 괴리, 그리고 발표 직후 반응이 장 마감까지 이어지는지를 봅니다. 기록은 그날 데일리 기록과 함께 저장됩니다.</p>
+        ${(() => {
+          const rec = window.Calendar ? window.Calendar.recent(Date.now()) : [];
+          return rec.length ? `<p class="warn-line">최근 발표: ${rec.map((e) => `<b>${esc(e.name)}</b> (${esc(e.kstDate.slice(5).replace('-', '/'))} ${esc(e.kstTime)}) <button class="btn mini" type="button" data-act="event-pick" data-val="${esc(e.event)}">이 이벤트로 점검</button>`).join(' · ')}</p>` : '';
+        })()}
         <div class="fields">
           <label class="fld"><span>이벤트</span><select data-key="이벤트_종류" id="eventType">${opts.map((o) => `<option value="${o}">${o || '오늘 이벤트 없음'}</option>`).join('')}</select></label>
           <label class="fld"><span>시장 기대 (컨센서스)</span><input type="text" data-key="이벤트_시장기대" placeholder="예: 근원 CPI 전월비 0.3%" /></label>
@@ -1931,6 +1956,8 @@
         if (a === 'goto-industry') { e.preventDefault(); gotoTab('industry'); return; }
         if (a === 'goto-company') { e.preventDefault(); gotoTab('company'); return; }
         if (a === 'goto-brief') { e.preventDefault(); gotoTab('brief'); return; }
+        if (a === 'goto-event') { e.preventDefault(); gotoTab('event'); return; }
+        if (a === 'event-pick') { const sel = $('#eventType'); if (sel) { sel.value = act.dataset.val; renderEventChecklist(); saveDraft(); toast(`이벤트를 ${act.dataset.val}(으)로 정했어요`, 'ok'); } return; }
         if (a === 'load-scores') { e.preventDefault(); loadRecords(); return; }
         if (a === 'copy-ai-concl') { e.preventDefault(); if (conclusionText(collect($('#view-daily'))) && !confirm('내 결론 칸을 AI 결론으로 바꿀까요?')) return; applyConclusion(state.aiConcl || {}, 'AI 리서치센터'); gotoTab('daily'); if ($('#myConcl')) $('#myConcl').open = true; setTimeout(() => $('#conclusionPanel').scrollIntoView({ behavior: 'smooth' }), 50); return; }
         if (a === 'debate-resume') { const f = (state.debateRun || {}).failed; f === 'chief' ? runChief() : runDebate(f); return; }
