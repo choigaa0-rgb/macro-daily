@@ -132,6 +132,7 @@ main { width: 100%; max-width: 1240px; margin: 0 auto; padding: 24px 32px 48px; 
 .card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
 .panel { display: flex; flex-direction: column; gap: 16px; }
 .hint { font-size: 13px; color: var(--ink-2); margin: 6px 0 10px; }
+.warn-line { font-size: 13px; color: var(--warn); background: var(--warn-bg); border-radius: var(--radius-s); padding: 8px 12px; margin: 6px 0 10px; }
 
 /* 개요 */
 .overview {

@@ -96,6 +96,7 @@
     Object.assign(d, collect($('#view-event')), collect($('#view-brief')));
     d.__aiConcl = state.aiConcl || null;
     d.__aiSrc = state.aiSrc || null;
+    d.__aiSnap = state.aiSnap || null;
     d.__cmpMatch = state.cmpMatch || '';
     d.__ai = state.aiText;
     d.__cmp = state.cmpText || '';
@@ -743,11 +744,23 @@
       <button class="btn mini" data-act="goto-center" type="button">토론 전체 보기</button></div></details>`;
   }
 
+  // 한국 숫자가 미국 기준일 대비 어느 서울 장인지 (AI가 '오늘 서울 장'으로 착각하지 않도록)
+  function krNoteText() {
+    if (!state.market) return '';
+    const sig = S.all(state.market.items);
+    const f = sig.krFresh || {};
+    const md = (x) => (x ? x.slice(5).replace('-', '/') : '-');
+    const us = md(sig.signalDate);
+    if (f.state === 'after') return `한국 숫자(${md(f.date)} 서울 장)는 미국 ${us} 장 뒤에 열린 장이다. 미국 영향의 한국 전이를 판단할 수 있다.`;
+    if (f.state === 'same') return `한국 숫자(${md(f.date)} 서울 장)는 미국 ${us} 장보다 먼저 끝난 장이다. 한국 전이는 '다음 서울 장 전망'으로만 다룬다.`;
+    if (f.state === 'stale') return `한국 데이터가 오래됨: KOSPI가 ${md(f.date)} 종가까지만 있다 (미국 기준일 ${us}). 한국 숫자를 최근 흐름으로 단정하지 말 것.`;
+    return '';
+  }
   async function debateCall(stage) {
     const d = collect($('#view-daily'));
     const prev = previousRecord();
     const j = await api('/api/debate', { method: 'POST', body: JSON.stringify({
-      stage, date: state.date, analystText: analystText(), dataText: dataText(), manualText: manualText(d),
+      stage, date: state.date, analystText: analystText(), dataText: dataText(), manualText: manualText(d), krNote: krNoteText(),
       previousText: prev ? `${prev.date}: 뷰 ${prev.rec['뷰 변화'] || '-'}, ${prev.rec['종합 해석'] || prev.rec['오늘의 동인'] || ''}` : '',
       debate: state.debate,
     }) });
@@ -795,6 +808,7 @@
       state.debate.chiefAt = new Date().toISOString();
       state.debateRun = {};
       state.aiConcl = b || {};
+      state.aiSnap = state.market ? { items: S.snapshot(state.market.items), at: new Date().toLocaleString('ko-KR', { hour12: false }), warn: '' } : null;
       state.aiSrc = { source: '지금 생성', at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }), model: (state.debate.models || {}).chief || '' };
       saveDraft();
       toast('AI 센터장 결론이 나왔습니다. 오늘의 브리핑에서 확인하세요', 'ok');
@@ -816,6 +830,10 @@
         state.debate = JSON.parse(row['토론 JSON']);
         if (row['AI 결론 JSON']) {
           state.aiConcl = JSON.parse(row['AI 결론 JSON']);
+          // AI가 아침에 본 숫자 (예전 기록엔 없음 → 지금 데이터로 대조)
+          let snap = null;
+          try { snap = row['데이터 스냅샷'] ? JSON.parse(row['데이터 스냅샷']) : null; } catch (e) { snap = null; }
+          state.aiSnap = snap ? { items: snap, at: row['생성시각'] || '', warn: row['한국 데이터 경고'] || '' } : null;
           state.aiSrc = { source: '아침 자동' + fromNote(row), at: row['생성시각'] || '', model: row['모델'] || '' };
         }
         state.morningMsg = '';
@@ -862,11 +880,23 @@
     if (D.risk) parts.push(D.risk.reason, D.risk.key_issue, D.risk.bull_wrong_if, D.risk.bear_wrong_if);
     return parts.filter(Boolean).join('\n');
   }
+  // 데이터 대조: AI가 분석할 때 본 숫자(스냅샷)와 비교. 지금 데이터가 더 새 날짜면 '지금 값'을 따로 보여줌
   function verifyNow() {
-    if (!state.market) return null;
-    const list = S.verifyClaims(aiAllText(), state.market.items);
+    const snap = state.aiSnap && state.aiSnap.items;
+    const base = snap || (state.market && state.market.items);
+    if (!base) return null;
+    const list = S.verifyClaims(aiAllText(), base);
+    const md = (x) => (x ? x.slice(5).replace('-', '/') : '');
+    if (snap && state.market) {
+      const cur = S.snapshot(state.market.items);
+      list.forEach((x) => {
+        const a = snap[x.id], b = cur[x.id];
+        if (a && a.date) x.asOf = md(a.date);
+        if (a && b && b.date && a.date && b.date > a.date && b.chg != null) x.now = `${md(b.date)} ${b.chg > 0 ? '+' : ''}${b.chg}${b.chgUnit === 'bp' ? 'bp' : b.chgUnit === '%' ? '%' : ''}`;
+      });
+    }
     const n = (st) => list.filter((x) => x.status === st).length;
-    return { list, ok: n('일치'), bad: n('불일치'), na: list.length - n('일치') - n('불일치') };
+    return { list, ok: n('일치'), bad: n('불일치'), na: list.length - n('일치') - n('불일치'), snap: !!snap, at: state.aiSnap ? state.aiSnap.at : '', warn: state.aiSnap ? state.aiSnap.warn : '', newer: list.filter((x) => x.now).length };
   }
 
   function renderBriefShell() {
@@ -1009,10 +1039,16 @@
     const box = $('#crossAuto');
     if (!box) return;
     const v = state.aiConcl || (state.debate && state.debate.open) ? verifyNow() : null;
-    box.innerHTML = `${!v ? '<p class="muted">AI 브리핑이 나오면 자동으로 대조합니다.</p>' : !v.list.length ? '<p class="muted">대조할 숫자를 찾지 못했습니다.</p>' : `
+    const asOf = (x) => (x.asOf ? ` <span class="muted">(${esc(x.asOf)} 기준)</span>` : '');
+    const nowC = (x) => (x.now ? `<td class="muted">지금: ${esc(x.now)}</td>` : '<td></td>');
+    box.innerHTML = `${!v ? '<p class="muted">AI 브리핑이 나오면 자동으로 대조합니다.</p>' : `
+        <p class="hint">${v.snap ? `AI가 분석할 때 본 데이터${v.at ? `(${esc(v.at)} 수집)` : ''}와 비교합니다. AI가 숫자를 잘못 옮겼는지 확인하는 단계예요.` : '지금 화면의 데이터와 비교합니다. (이 기록엔 AI가 본 데이터가 저장돼 있지 않아, AI 이후에 나온 새 장 숫자와 달라 보일 수 있어요)'}</p>
+        ${v.warn ? `<p class="warn-line">⚠ ${esc(v.warn)}</p>` : ''}
+        ${!v.list.length ? '<p class="muted">대조할 숫자를 찾지 못했습니다.</p>' : `
         <p><span class="badge ${v.bad ? 'bad' : 'good'}">${v.bad ? `불일치 ${v.bad}건` : '모두 일치'}</span> 숫자 ${v.list.length}개 중 일치 ${v.ok} · 불일치 ${v.bad}${v.na ? ` · 확인 불가 ${v.na}` : ''}</p>
-        ${v.bad ? `<table class="g-table">${v.list.filter((x) => x.status === '불일치').map((x) => `<tr><th class="miss">✗</th><td>AI: ${esc(x.text)}</td><td>실제: ${esc(x.actual || '-')}</td></tr>`).join('')}</table>` : ''}
-        <details class="qs"><summary>대조한 숫자 전체</summary><table class="g-table">${v.list.map((x) => `<tr><th class="${x.status === '일치' ? 'hit' : x.status === '불일치' ? 'miss' : 'muted'}">${x.status === '일치' ? '✓' : x.status === '불일치' ? '✗' : '?'}</th><td>${esc(x.text)}</td><td>${esc(x.actual || x.status)}</td></tr>`).join('')}</table></details>`}`;
+        ${v.bad ? `<table class="g-table">${v.list.filter((x) => x.status === '불일치').map((x) => `<tr><th class="miss">✗</th><td>AI: ${esc(x.text)}</td><td>실제: ${esc(x.actual || '-')}${asOf(x)}</td>${nowC(x)}</tr>`).join('')}</table>` : ''}
+        ${v.newer ? `<p class="hint">그 뒤 새 장이 열려 지금 값이 달라진 숫자 ${v.newer}개는 '지금' 칸에 따로 표시했어요. AI의 오류가 아니라 시간 차이입니다.</p>` : ''}
+        <details class="qs"><summary>대조한 숫자 전체</summary><table class="g-table">${v.list.map((x) => `<tr><th class="${x.status === '일치' ? 'hit' : x.status === '불일치' ? 'miss' : 'muted'}">${x.status === '일치' ? '✓' : x.status === '불일치' ? '✗' : '?'}</th><td>${esc(x.text)}</td><td>${esc(x.actual || x.status)}${asOf(x)}</td>${nowC(x)}</tr>`).join('')}</table></details>`}`}`;
     if (state.cmpText && $('#cmpOut') && !$('#cmpOut').dataset.filled) { $('#cmpOut').innerHTML = renderMarkdown(state.cmpText); $('#cmpOut').dataset.filled = '1'; }
     const sc = $('#crossScore');
     if (!sc) return;
@@ -1948,6 +1984,7 @@
     state.briefSnap = draft.__snap || '';
     state.aiConcl = draft.__aiConcl || null;
     state.aiSrc = draft.__aiSrc || null;
+    state.aiSnap = draft.__aiSnap || null;
     state.cmpMatch = draft.__cmpMatch || '';
     state.morningMsg = '';
     if (!state.aiConcl && state.morningTried !== state.date) { state.morningTried = state.date; setTimeout(() => loadMorning(true), 0); }

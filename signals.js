@@ -398,6 +398,28 @@
     return out;
   }
 
+  // AI가 분석할 때 본 숫자 (데이터 대조를 '그때 본 숫자' 기준으로 하기 위해 저장)
+  const KR_IDS = ['kospi', 'kosdaq', 'usdkrw', 'kr3y', 'kr10y'];
+  function snapshot(items) {
+    const A = align(items).items;
+    const out = {};
+    Object.keys(items || {}).forEach((id) => {
+      const it = KR_IDS.includes(id) ? items[id] : A[id];
+      if (!it || !it.ok) return;
+      out[id] = { ok: true, date: it.date || lastDate(it), value: it.value, prev: it.prev == null ? null : it.prev, chg: it.chg == null ? null : it.chg, chgUnit: it.chgUnit };
+    });
+    return out;
+  }
+  // 한국 데이터가 미국 기준일 대비 어느 장인지
+  //  after: 미국 기준일 뒤에 열린 서울 장 → 미국 영향이 반영된 '전이' 판단 가능
+  //  same : 미국 기준일과 같은 날 서울 장(미국 장보다 먼저 끝남) → 전이는 아직 일어나지 않음, 전망으로만
+  //  stale: 미국 기준일보다 오래된 서울 장 → 최신 서울 장이 빠졌을 수 있음
+  function koreaFreshness(items, signalDate) {
+    const k = items && items.kospi && items.kospi.ok ? (items.kospi.date || lastDate(items.kospi)) : null;
+    if (!k || !signalDate) return { date: k, state: 'unknown' };
+    return { date: k, state: k > signalDate ? 'after' : k === signalDate ? 'same' : 'stale' };
+  }
+
   function all(items) {
     const A = align(items);
     const us = A.items;
@@ -406,6 +428,7 @@
     const pct = (id) => c(us, id);
     const out = {
       signalDate: A.date,
+      krFresh: koreaFreshness(items, A.date),
       dateMismatch: A.mismatch,
       latestDate: A.latest,
       curve: curve(c(us, 'us2y'), c(us, 'us10y')),
@@ -423,5 +446,5 @@
     return out;
   }
 
-  return { curve, stockRate, alignment, decompose, vixRegime, hyRegime, dollar, korea, phase, flags, align, all, topMovers, recommendStory, FORECASTS, HORIZON, scoreOne, scoreRecords, ACTORS, scoreActors, sectorView, sectorText, verifyClaims };
+  return { curve, stockRate, alignment, decompose, vixRegime, hyRegime, dollar, korea, phase, flags, align, all, topMovers, recommendStory, FORECASTS, HORIZON, scoreOne, scoreRecords, ACTORS, scoreActors, sectorView, sectorText, verifyClaims, snapshot, koreaFreshness };
 });

@@ -161,3 +161,20 @@ t('섹터: 신호에 따른 유리·불리', () => {
 });
 
 console.log(`\n${n}개 테스트 통과`);
+
+// 데이터 대조는 AI가 본 숫자(스냅샷) 기준: 아침에 오래된 KOSPI를 본 AI를 저녁 데이터로 채점하지 않음
+{
+  const mk = (date, value, prev, chg, unit) => ({ ok: true, date, value, prev, chg, chgUnit: unit, pts: [['2026-11-01', prev], [date, value]] });
+  const morning = { us2y: mk('2026-11-10', 4.73, 4.56, 17, 'bp'), us10y: mk('2026-11-10', 4.98, 4.88, 10, 'bp'), spx: mk('2026-11-10', 7520.93, 7549.6, -0.38, '%'), kospi: mk('2026-11-09', 5018.85, 5059.8, -0.81, '%'), usdkrw: mk('2026-11-10', 1343.2, 1362.7, -1.43, '%') };
+  const evening = Object.assign({}, morning, { kospi: mk('2026-11-11', 5375.36, 5239.13, 2.6, '%') });
+  const text = '미국 2년물 +17bp 급등, KOSPI -0.81% 하락';
+  assert.deepStrictEqual(S.verifyClaims(text, evening).map((x) => x.status), ['일치', '불일치']);
+  assert.deepStrictEqual(S.verifyClaims(text, S.snapshot(morning)).map((x) => x.status), ['일치', '일치']);
+  assert.strictEqual(S.all(morning).krFresh.state, 'stale');
+  assert.strictEqual(S.all(evening).krFresh.state, 'after');
+  assert.strictEqual(S.all(Object.assign({}, morning, { kospi: mk('2026-11-10', 5239.13, 5018.85, 4.39, '%') })).krFresh.state, 'same');
+  const D = require('../api/_data.js');
+  const h = D.marketHeadlines([{ source: 'A', title: '코스피 반도체 급등, 외국인 순매수', time: 2 }, { source: 'B', title: '날씨 맑음', time: 3 }, { source: 'C', title: '미국 CPI 예상 상회', time: 1 }]);
+  assert.deepStrictEqual(h.map((x) => x.source), ['A', 'C']);
+  console.log('ok - 데이터 대조 스냅샷 기준·한국 데이터 시점·시장 헤드라인 선별');
+}

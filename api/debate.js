@@ -5,6 +5,7 @@
 // POST /api/debate { stage: 'open' | 'rebut' | 'risk' | 'chief', date, analystText, dataText, manualText, previousText, debate }
 
 const { sendJson, checkPasscode, readBody, callGemini } = require('./_lib');
+const { fetchNews, marketHeadlines, headlinesText } = require('./_data');
 
 const COMMON = `너는 한국 증권사 리서치센터의 데일리 매크로 토론을 진행한다.
 원칙:
@@ -13,6 +14,8 @@ const COMMON = `너는 한국 증권사 리서치센터의 데일리 매크로 �
 3. 한국(원달러, KOSPI, 외국인, 국고채)으로의 전이를 꼭 다룬다.
 4. 투자 권유는 하지 않는다. 전망은 학습용 방향 판단이다.
 5. 한국어로, 문장은 짧게. JSON 하나만 출력한다.
+6. 숫자마다 기준일이 다르다. [한국 데이터 시점]이 있으면 따른다. 한국 숫자를 쓸 때는 날짜를 붙인다.
+7. [시장 헤드라인]은 제목뿐이다. 원인·업종 이슈(실적, 수출, 수급, 정책)의 근거로 쓰되 제목에 있는 사실만 쓰고 "(헤드라인)"을 붙인다. 규칙 기반 섹터 연결과 헤드라인이 다르면 헤드라인 쪽 이슈를 무시하지 않는다.
 전망은 다음 5거래일 뒤 방향(상승|보합|하락)이며 보합 범위는 미국 10년물 ±3bp, S&P500 ±0.5%, 원달러 ±0.5%, KOSPI ±0.7%이다.`;
 
 const FC = `{ "미국10년물": "상승|보합|하락", "S&P500": "상승|보합|하락", "원달러": "상승|보합|하락", "KOSPI": "상승|보합|하락" }`;
@@ -100,8 +103,14 @@ module.exports = async (req, res) => {
   const stage = body.stage;
   if (!PROMPTS[stage]) return sendJson(res, 400, { ok: false, error: '알 수 없는 단계' });
 
+  // 첫 발언·센터장 단계에는 언론사 헤드라인을 함께 넣음 (규칙만으로 한국장을 해석하지 않도록)
+  let heads = '';
+  if (stage === 'open' || stage === 'chief') {
+    const news = await fetchNews({ hours: 30, max: 160 }).catch(() => ({ items: [] }));
+    heads = headlinesText(marketHeadlines(news.items, 20));
+  }
   const text = `점검 날짜: ${body.date || ''}
-
+${body.krNote ? `\n[한국 데이터 시점]\n${body.krNote}\n` : ''}
 [애널리스트 팀 보고서 (규칙 기반 자동 신호)]
 ${body.analystText || '(없음)'}
 
@@ -115,7 +124,7 @@ ${body.manualText || '(없음)'}
 ${body.previousText || '(없음)'}
 
 [지금까지의 토론]
-${debateText(body.debate)}`;
+${debateText(body.debate)}${heads ? `\n\n[시장 헤드라인 (언론사 RSS 제목, 최근 30시간)]\n${heads}` : ''}`;
 
   const r = await callGemini({ system: PROMPTS[stage], parts: [{ text }], temperature: stage === 'open' ? 0.6 : 0.4, json: true, maxOutputTokens: 1800 });
   if (!r.ok) return sendJson(res, r.status, { ok: false, error: r.error });

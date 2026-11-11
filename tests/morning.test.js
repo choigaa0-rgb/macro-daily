@@ -19,8 +19,10 @@ const debate = {
   chief: { '오늘의 동인': '동인', '이야기': '정책', '국면 판단': '판단 보류', '뷰 변화': '유지', '투자 시사점': '유리: 금융', '종합 해석': '(테스트) AI 센터장 결론', '전망': { '미국10년물': '상승', 'S&P500': '보합', '원달러': '상승', 'KOSPI': '하락' } },
 };
 let geminiFails = false;
+let lastPrompt = '';
 global.fetch = async (url, opts) => {
   if (String(url).includes('generativelanguage')) {
+    lastPrompt = JSON.stringify(JSON.parse(opts.body).contents);
     if (geminiFails) return { ok: false, status: 400, json: async () => ({ error: { message: 'bad key' } }) };
     return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(debate) }] } }] }) };
   }
@@ -60,6 +62,13 @@ function call(query, headers = {}) {
   assert.ok(mail.html.includes('https://macro.test/'));
   fs.writeFileSync(path.join(process.argv[2] || '/tmp', 'morning-mail.html'), mail.html);
   console.log('ok - 크론 실행: 시트 저장 + 메일 발송', r.body.steps.join(' → '));
+
+  // AI가 본 숫자 저장 + 한국 데이터 시점 안내 (교차검증에서 '나중 데이터'와 비교해 생기던 가짜 불일치 방지)
+  const snap = JSON.parse(rec['데이터 스냅샷']);
+  assert.ok(snap.kospi && snap.kospi.date && snap.us10y && snap.us10y.chg != null);
+  assert.strictEqual(rec['한국 기준일'], snap.kospi.date);
+  assert.ok(lastPrompt.includes('[한국 데이터 시점]') && lastPrompt.includes('KOSPI') && lastPrompt.includes('종가]'));
+  console.log('ok - 아침 브리핑: AI가 본 데이터 스냅샷·한국 기준일 저장, 한국 데이터 시점 안내');
 
   posted.length = 0;
   geminiFails = true;

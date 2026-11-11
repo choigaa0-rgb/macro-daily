@@ -94,6 +94,19 @@ async function fetchNews({ hours = 30, max = 140 } = {}) {
     });
   return { items: items.slice(0, max), errors, feeds: FEEDS.length };
 }
+// 시황 판단에 쓸 헤드라인만 고름 (제목만 · 사실 확인용). AI가 '규칙'만으로 한국장을 해석하지 않도록 아침 브리핑·토론에 함께 넣음
+const MARKET_KW = ['증시', '코스피', 'KOSPI', '코스닥', '외국인', '기관', '순매수', '순매도', '반도체', 'HBM', '수출', '실적', '금리', '국채', '환율', '원달러', '달러', '연준', 'Fed', 'FOMC', 'CPI', '물가', '고용', '유가', '엔비디아', 'AI', '나스닥', '뉴욕', '월가', '관세', '한국은행', '금통위', '사이드카', 'IPO', '상장'];
+function marketHeadlines(items, max = 25) {
+  const score = (n) => MARKET_KW.reduce((a, k) => a + (n.title.includes(k) ? 1 : 0), 0);
+  return (items || []).map((n) => ({ n, s: score(n) })).filter((x) => x.s > 0)
+    .sort((a, b) => b.s - a.s || (b.n.time || 0) - (a.n.time || 0)).slice(0, max)
+    .sort((a, b) => (b.n.time || 0) - (a.n.time || 0)).map((x) => x.n);
+}
+function headlinesText(list) {
+  if (!list || !list.length) return '';
+  const kst = (t) => (t ? new Date(t + 9 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '');
+  return list.map((n) => `- [${n.source}${n.time ? ` ${kst(n.time)}` : ''}] ${n.title}`).join('\n');
+}
 function newsFor(company, items) {
   return items.filter((n) => company.aliases.some((a) => n.title.includes(a.trim()) || (n.desc || '').includes(a.trim())));
 }
@@ -395,4 +408,4 @@ async function secFilings(cik) {
   return out;
 }
 
-module.exports = { UNIVERSE, FEEDS, parseRss, fetchNews, newsFor, yahooChart, rankAttention, priceStats, unzipFirst, dartCorpCode, dartFinancials, dartShares, dartDisclosures, dartCompany, brokerReports, parseNaverResearch, reportSummary, secCik, secFinancials, secFilings, annualPair, pickAccounts };
+module.exports = { UNIVERSE, FEEDS, parseRss, fetchNews, marketHeadlines, headlinesText, newsFor, yahooChart, rankAttention, priceStats, unzipFirst, dartCorpCode, dartFinancials, dartShares, dartDisclosures, dartCompany, brokerReports, parseNaverResearch, reportSummary, secCik, secFinancials, secFilings, annualPair, pickAccounts };

@@ -7,6 +7,7 @@
 
 const { sendJson, fetchWithTimeout, callGemini } = require('./_lib');
 const { collectMarket } = require('./market');
+const { fetchNews, marketHeadlines, headlinesText } = require('./_data');
 const S = require('../signals.js');
 
 const LABELS = {
@@ -19,7 +20,9 @@ const TITLES = { curve: '커브 패턴', stockRate: '주식 × 금리 조합', a
 
 const PROMPT = `너는 한국 증권사 리서치센터의 아침 매크로 토론을 한 번에 정리한다.
 TradingAgents 구조: 애널리스트 보고서(주어짐) → BULL(낙관)·BEAR(비관) 연구원 토론 → 리스크 팀 중립 평가 → 리서치센터장 결론.
-원칙: 주어진 숫자·사실만 쓴다. 뉴스·발언·수급 수치를 지어내지 않는다. 원인을 모르면 "원인 확인 필요". 한국(원달러, KOSPI, 국고채) 전이를 꼭 다룬다. 투자 권유 금지, 종목 추천 금지. 한국어, 짧은 문장. JSON 하나만 출력.
+원칙: 주어진 숫자·사실만 쓴다. 뉴스·발언·수급 수치를 지어내지 않는다. 원인을 모르면 "원인 확인 필요". 한국(원달러, KOSPI, 국고채) 전이를 꼭 다룬다.
+날짜: 숫자마다 기준일이 다르다. [한국 데이터 시점]의 안내를 반드시 따른다. 한국 숫자를 '오늘 서울 장'처럼 쓰지 말고, 쓸 때는 "11/10 KOSPI"처럼 날짜를 붙인다.
+뉴스: [시장 헤드라인]은 제목뿐이다. 원인·업종 이슈(실적, 수출, 수급, 정책)를 설명할 때 근거로 쓰되 제목에 있는 사실만 쓰고, 쓴 곳에는 "(헤드라인)"을 붙인다. 규칙 기반 섹터 연결(환율·금리로 유불리 판단)과 헤드라인이 다르면 둘 다 적고, 헤드라인 쪽 이슈를 무시하지 않는다. 투자 권유 금지, 종목 추천 금지. 한국어, 짧은 문장. JSON 하나만 출력.
 전망은 다음 5거래일 뒤 방향(상승|보합|하락). 보합 범위: 미국 10년물 ±3bp, S&P500 ±0.5%, 원달러 ±0.5%, KOSPI ±0.7%.
 출력:
 { "headline": "오늘 아침 한 줄 요약",
@@ -45,20 +48,44 @@ function line(src, id) {
   return `${label} ${Number(x.value).toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })} (${sgn(x.chg, x.chgUnit === 'bp' ? 1 : 2, u)})`;
 }
 
-function buildTexts(items, sig) {
+const dd = (d) => (d ? d.slice(5).replace('-', '/') : '-');
+function lineD(src, id) {
+  const l = line(src, id);
+  return l && src[id].date ? `${l} [${dd(src[id].date)} 종가]` : l;
+}
+
+// 한국 데이터가 어느 서울 장인지 AI에 알려줌 (아침 7시에는 미국 장의 영향이 아직 서울 장에 반영되지 않음)
+function koreaNote(sig) {
+  const f = sig.krFresh || {};
+  const us = dd(sig.signalDate);
+  if (f.state === 'after') return { warn: '', text: `한국 숫자(${dd(f.date)} 서울 장)는 미국 ${us} 장 뒤에 열린 장이다. 미국 영향이 한국에 어떻게 전이됐는지 판단할 수 있다.` };
+  if (f.state === 'same') return { warn: '', text: `한국 숫자(${dd(f.date)} 서울 장)는 미국 ${us} 장보다 먼저 끝난 장이다. 미국 ${us} 장의 영향은 아직 서울 장에 나타나지 않았다. 한국 전이는 '오늘 서울 장 전망'으로만 다룬다.` };
+  if (f.state === 'stale') {
+    const warn = `한국 데이터가 오래됨: KOSPI가 ${dd(f.date)} 종가까지만 들어왔다 (미국 기준일 ${us}). 그 뒤 서울 장이 빠졌을 수 있다.`;
+    return { warn, text: `${warn} 한국 숫자를 최근 흐름으로 단정하지 말고 "데이터 확인 필요"라고 적는다. 한국 전이는 전망으로만 다룬다.` };
+  }
+  return { warn: '', text: '한국 데이터 기준일을 알 수 없다. 한국 숫자는 참고만 한다.' };
+}
+
+function buildTexts(items, sig, headlines) {
   const A = S.align(items).items;
   const sl = (k) => (sig[k] ? `${TITLES[k]}: ${sig[k].name} — ${sig[k].meaning}` : null);
+  const kn = koreaNote(sig);
   const groups = {
     'RATE · 금리': [line(A, 'us2y'), line(A, 'us10y'), line(A, 't10y2y'), sl('curve'), sl('decompose')],
-    'FX · 달러·원자재': [line(A, 'dxy'), line(items, 'usdkrw'), sl('dollar'), line(A, 'wti'), line(A, 'brent'), line(A, 'gold'), line(A, 'copper')],
+    'FX · 달러·원자재': [line(A, 'dxy'), lineD(items, 'usdkrw'), sl('dollar'), line(A, 'wti'), line(A, 'brent'), line(A, 'gold'), line(A, 'copper')],
     'EQUITY · 주식·심리': [line(A, 'dow'), line(A, 'spx'), line(A, 'ndx'), line(A, 'rut'), line(A, 'sox'), sl('alignment'), sl('stockRate'), line(A, 'vix'), sl('hy')],
-    'KOREA · 한국': [line(items, 'kospi'), line(items, 'kosdaq'), line(items, 'kr3y'), line(items, 'kr10y'), sl('korea')],
+    // 서울 장이 미국 장 뒤에 열렸을 때만 '한국 전이' 신호를 줌 (아니면 같은 날 숫자끼리 비교해 잘못된 전이가 나옴)
+    'KOREA · 한국': [lineD(items, 'kospi'), lineD(items, 'kosdaq'), lineD(items, 'kr3y'), lineD(items, 'kr10y'), sig.krFresh && sig.krFresh.state === 'after' ? sl('korea') : null],
   };
+  const flags = (sig.flags || []).concat(kn.warn ? [kn.warn] : []);
   const analyst = `신호 기준일: 미국 ${sig.signalDate || '-'} 종가\n` +
+    `\n[한국 데이터 시점]\n${kn.text}\n\n` +
     Object.entries(groups).map(([k, v]) => `[${k}]\n${v.filter(Boolean).map((l) => `- ${l}`).join('\n')}`).join('\n\n') +
-    (sig.flags && sig.flags.length ? `\n\n[주의 신호]\n${sig.flags.map((f) => `- ${f}`).join('\n')}` : '') +
-    (sig.sectors ? `\n\n[섹터 연결 (규칙 기반)]\n${S.sectorText(sig.sectors)}` : '');
-  return { analyst, groups };
+    (flags.length ? `\n\n[주의 신호]\n${flags.map((f) => `- ${f}`).join('\n')}` : '') +
+    (sig.sectors ? `\n\n[섹터 연결 (규칙 기반 · 환율·금리만 본 것)]\n${S.sectorText(sig.sectors)}` : '') +
+    (headlines ? `\n\n[시장 헤드라인 (언론사 RSS 제목, 최근 30시간)]\n${headlines}` : '\n\n[시장 헤드라인]\n(가져오지 못함 — 원인은 "원인 확인 필요"로)');
+  return { analyst, groups, krWarn: kn.warn };
 }
 
 function parseJson(text) {
@@ -120,10 +147,16 @@ module.exports = async (req, res) => {
   const date = url.searchParams.get('date') || kstDate();
   const steps = [];
   try {
-    const market = url.searchParams.get('mock') === '1' ? require('./_mock.js') : await collectMarket();
+    const mock = url.searchParams.get('mock') === '1';
+    const [market, news] = await Promise.all([
+      mock ? require('./_mock.js') : collectMarket(),
+      mock ? { items: [] } : fetchNews({ hours: 30, max: 160 }).catch(() => ({ items: [] })),
+    ]);
     const sig = S.all(market.items);
-    const { analyst, groups } = buildTexts(market.items, sig);
-    steps.push(`데이터 수집 (${Math.round((Date.now() - started) / 1000)}초)`);
+    const heads = marketHeadlines(news.items, 25);
+    const { analyst, groups, krWarn } = buildTexts(market.items, sig, headlinesText(heads));
+    if (krWarn) sig.flags = (sig.flags || []).concat(krWarn); // 메일에도 경고 표시
+    steps.push(`데이터 수집 (${Math.round((Date.now() - started) / 1000)}초 · 헤드라인 ${heads.length}개)`);
 
     // AI 토론: 시트 저장·메일 발송 시간을 남겨두고 한 번에
     let D = null, model = '', aiError = '';
@@ -144,6 +177,11 @@ module.exports = async (req, res) => {
       '토론 JSON': debate ? JSON.stringify(debate) : '',
       'AI 결론 JSON': chief ? JSON.stringify(chief) : '',
       'AI 종합 해석': chief ? chief['종합 해석'] || '' : '',
+      '한국 기준일': (sig.krFresh && sig.krFresh.date) || '',
+      '한국 데이터 경고': krWarn || '',
+      '헤드라인 수': heads.length,
+      // AI가 이때 본 숫자: 대시보드의 데이터 대조가 '나중 데이터'가 아니라 이것과 비교함
+      '데이터 스냅샷': JSON.stringify(S.snapshot(market.items)),
     };
     // 출처별 5거래일 전망 (나중에 자동 채점)
     ['미국10년물', 'S&P500', '원달러', 'KOSPI'].forEach((k) => {
