@@ -879,12 +879,12 @@
         <details class="x-det" id="xReport"><summary><b>② 증권사 리포트 대조</b><span class="muted">오늘 시황 리포트 PDF를 올려 AI 결론과 비교</span></summary>
           <div class="report-block cross-report">
           <ol class="steps">
-            <li><a href="https://consensus.hankyung.com/analysis/list?skinType=market" target="_blank" rel="noopener">한경컨센서스 시장 리포트</a>에서 오늘 날짜의 데일리·시황 리포트를 하나 고릅니다.</li>
+            <li><a href="https://consensus.hankyung.com/analysis/list?skinType=market" target="_blank" rel="noopener">한경컨센서스 시장 리포트</a>에서 오늘 날짜의 데일리·시황 리포트를 고릅니다. (여러 증권사 리포트를 함께 올리면 증권사 간 합의·이견도 정리합니다)</li>
             <li>PDF를 올리거나 핵심 부분을 붙여넣고 <b>AI로 교차검증</b>을 누르면, 오늘의 결론과 일치도·다른 점·숫자 차이·보완 제안을 정리합니다.</li>
           </ol>
           <label class="fld wide"><span>참고 리포트</span><input type="text" data-key="참고 리포트" placeholder="증권사 · 리포트 제목" /></label>
-          <div class="fld wide"><span>리포트 PDF (3MB 이하)</span>
-            <div class="file-row"><input type="file" id="reportFile" accept="application/pdf" /><button class="btn ghost" id="clearFile" type="button">지우기</button></div></div>
+          <div class="fld wide"><span>리포트 PDF (여러 개 가능 · 최대 5개 · 파일당 3MB 이하)</span>
+            <div class="file-row"><input type="file" id="reportFile" accept="application/pdf" multiple /><button class="btn ghost" id="clearFile" type="button">지우기</button></div></div>
           <label class="fld wide"><span>또는 리포트 내용 붙여넣기</span><textarea id="reportText" rows="3" placeholder="리포트의 결론·전망 부분 (원문은 저장하지 않습니다)"></textarea></label>
           <button class="btn block-soft" id="compareBtn" type="button">AI로 교차검증</button>
           <div class="ai-out" id="cmpOut"><span class="muted">리포트를 올리고 교차검증을 누르세요.</span></div>
@@ -1276,24 +1276,50 @@
     const ai = aiConclText();
     const concl = [ai && `[AI 센터장 결론]\n${ai}`, mine && `[사용자 결론]\n${mine}`].filter(Boolean).join('\n\n');
     const text = $('#reportText').value.trim();
-    const file = $('#reportFile').files[0];
-    if (!file && !text) { toast('리포트 PDF를 올리거나 내용을 붙여넣어 주세요', 'err'); return; }
+    const files = Array.from($('#reportFile').files || []);
+    if (!files.length && !text) { toast('리포트 PDF를 올리거나 내용을 붙여넣어 주세요', 'err'); return; }
+    if (files.length > 5) { toast('PDF는 한 번에 5개까지 올릴 수 있어요', 'err'); return; }
+    const big = files.find((f) => f.size > 3 * 1024 * 1024);
+    if (big) { toast(`${big.name}이(가) 3MB를 넘어요. 빼거나 핵심 부분을 붙여넣어 주세요`, 'err'); return; }
     if (!concl && !confirm('비교할 결론이 아직 없어요. 리포트 요약만 받을까요?')) return;
-    let pdf = null;
-    if (file) {
-      if (file.size > 3 * 1024 * 1024) { toast('PDF가 3MB를 넘어요. 핵심 부분을 붙여넣어 주세요', 'err'); return; }
-      pdf = await new Promise((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(String(r.result).split(',')[1]);
-        r.onerror = () => rej(new Error('파일을 읽지 못했습니다'));
-        r.readAsDataURL(file);
-      });
-    }
+    const readB64 = (file) => new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result).split(',')[1]);
+      r.onerror = () => rej(new Error(`${file.name} 파일을 읽지 못했습니다`));
+      r.readAsDataURL(file);
+    });
     const btn = $('#compareBtn');
     btn.disabled = true; btn.textContent = '비교 중…';
-    $('#cmpOut').innerHTML = '<span class="muted">AI가 리포트를 읽고 내 결론과 비교하고 있습니다…</span>';
+    const status = (m) => { $('#cmpOut').innerHTML = `<span class="muted">${esc(m)}</span>`; };
+    status('AI가 리포트를 읽고 결론과 비교하고 있습니다…');
+    const names = files.map((f) => f.name.replace(/\.pdf$/i, '')).join(', ');
+    const reportName = d['참고 리포트'] || names;
+    const nameInput = $('#view-brief [data-key="참고 리포트"]');
+    if (!d['참고 리포트'] && names && nameInput) nameInput.value = names; // 시트에 어떤 리포트와 비교했는지 남김
     try {
-      const j = await api('/api/compare', { method: 'POST', body: JSON.stringify({ date: state.date, reportName: d['참고 리포트'] || '', reportText: text, pdfBase64: pdf, conclusionText: concl, signalsText: signalsText() }) });
+      const pdfs = [];
+      for (const f of files) pdfs.push({ name: f.name, data: await readB64(f) });
+      const total = pdfs.reduce((a, p) => a + p.data.length, 0);
+      let body;
+      if (total <= 3.9 * 1024 * 1024) {
+        // 한 번에 보낼 수 있는 크기: PDF를 모두 함께 보냄
+        body = { pdfs, reportText: text };
+      } else {
+        // 합치면 너무 큼: PDF마다 핵심만 먼저 뽑은 뒤, 뽑은 글을 모아 한 번에 비교
+        const sums = [];
+        for (let i = 0; i < pdfs.length; i++) {
+          status(`리포트 ${i + 1}/${pdfs.length} 핵심 정리 중… (${pdfs[i].name})`);
+          try {
+            const x = await api('/api/compare', { method: 'POST', body: JSON.stringify({ mode: 'extract', pdfs: [pdfs[i]] }) });
+            sums.push(`[리포트 ${i + 1} · ${pdfs[i].name}]\n${x.text}`);
+          } catch (e) {
+            sums.push(`[리포트 ${i + 1} · ${pdfs[i].name}]\n(정리 실패: ${e.message})`);
+          }
+        }
+        status('정리한 리포트들을 결론과 비교하고 있습니다…');
+        body = { reportText: [sums.join('\n\n'), text && `[붙여넣은 내용]\n${text}`].filter(Boolean).join('\n\n') };
+      }
+      const j = await api('/api/compare', { method: 'POST', body: JSON.stringify(Object.assign({ date: state.date, reportName, conclusionText: concl, signalsText: signalsText() }, body)) });
       state.cmpText = j.text;
       const mm = /일치도\s*[:：]\s*(부분 일치|불일치|일치)/.exec(j.text);
       state.cmpMatch = mm ? mm[1] : '';
