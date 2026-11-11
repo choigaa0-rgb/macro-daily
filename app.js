@@ -1382,7 +1382,7 @@
           <label class="fld"><span>실제 결과</span><input type="text" data-key="이벤트_실제결과" placeholder="예: 0.4%" /></label>
           <label class="fld"><span>2년물 반응 (bp)</span><input type="number" step="any" data-key="이벤트_2년물반응" /></label>
           <label class="fld"><span>10년물 반응 (bp)</span><input type="number" step="any" data-key="이벤트_10년물반응" /></label>
-          <label class="fld"><span>FedWatch 확률 변화 (%p)</span><input type="number" step="any" data-key="이벤트_FedWatch변화" /></label>
+          <label class="fld"><span>FedWatch 확률 변화 (%p)</span><input type="number" step="any" data-key="이벤트_FedWatch변화" /><a class="fld-link" href="https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html" target="_blank" rel="noopener">CME FedWatch ↗</a></label>
           <label class="fld"><span>달러 반응</span><input type="text" data-key="이벤트_달러반응" placeholder="예: DXY +0.6%" /></label>
           <label class="fld"><span>섹터 반응</span><input type="text" data-key="이벤트_섹터반응" placeholder="금리 민감(기술·부동산) vs 금융" /></label>
           <label class="fld"><span>장 마감까지 반응</span><select data-key="이벤트_반응유지">${['', '유지', '일부 되돌림', '반전'].map((o) => `<option value="${o}">${o || '선택'}</option>`).join('')}</select></label>
