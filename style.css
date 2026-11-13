@@ -1285,3 +1285,16 @@ details.x-det[open] { padding-bottom: 12px; }
 .ins-tbl .down-t { color: var(--down); } .ins-tbl .up-t { color: var(--up); }
 .ins-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 .ins-gn { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+
+/* 서비스 소개 카드 */
+.intro > summary { cursor: pointer; list-style: none; line-height: 1.5; }
+.intro > summary::-webkit-details-marker { display: none; }
+.intro > summary::after { content: ' ▾'; color: var(--ink-2); }
+.intro[open] > summary::after { content: ' ▴'; }
+.intro-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 12px; }
+.intro-h { font-weight: 800; font-size: 13.5px; color: var(--accent); margin-bottom: 6px; }
+.intro p { font-size: 13.5px; line-height: 1.6; margin: 0 0 6px; }
+.intro-flow { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.55; }
+.intro-flow li { margin-bottom: 4px; }
+.intro-links { display: flex; gap: 16px; margin-top: 10px; font-size: 13px; }
+.intro-links a { color: var(--accent-2); text-decoration: none; font-weight: 650; }

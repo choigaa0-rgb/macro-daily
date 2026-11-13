@@ -20,6 +20,8 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 저장 불가 환경 */ } },
   };
   const settings = () => store.get('md-settings', { passcode: '', sheetUrl: '', mock: false });
+  // 소개 카드를 접거나 펴면 기억 (toggle 이벤트는 버블링되지 않아 캡처로 받음)
+  document.addEventListener('toggle', (e) => { if (e.target && e.target.id === 'introCard') store.set('md-intro-closed', !e.target.open); }, true);
 
   // ---------- 유틸 ----------
   function todayKST() {
@@ -978,6 +980,27 @@
     return `${t.getMonth() + 1}월 ${t.getDate()}일 ${'일월화수목금토'[t.getDay()]}요일`;
   }
 
+  // 처음 온 사람(심사위원 등)을 위한 서비스 소개. 접으면 다음부터 접힌 채로 보임
+  function introCard() {
+    const open = !store.get('md-intro-closed', false);
+    return `<details class="card intro" id="introCard"${open ? ' open' : ''}><summary><b>Macro Daily는</b> <span class="muted">AI가 매일 아침 매크로 시황을 정리하고, 그 분석이 맞는지 스스로 검증하는 리서치 도구예요</span></summary>
+      <div class="intro-grid">
+        <div><div class="intro-h">문제</div><p>금융권 취업준비생·개인투자자에게 매일의 매크로 점검(금리·환율·지수 → 해석 → 한국 영향), 산업 이슈, 기업 분석은 손으로 하면 하루 1시간이 넘게 걸리고, AI에 맡기면 틀린 숫자나 근거 없는 결론을 그대로 믿게 됩니다.</p></div>
+        <div><div class="intro-h">AI가 하는 일</div><ol class="intro-flow">
+          <li><b>수집</b> 미국 재무부·FRED·Yahoo·한국은행·DART 데이터와 언론사 헤드라인 (매일 07:00 자동)</li>
+          <li><b>규칙 해석</b> 커브 패턴·주식×금리 조합·한국 전이·국면을 코드로 판정</li>
+          <li><b>토론</b> BULL·BEAR 연구원 → 리스크 팀 → 리서치센터장 결론과 5거래일 전망</li>
+          <li><b>산업·기업</b> 전 산업 이슈 선별, 하루 1기업 스톡피치 카드 (숫자는 공시에서 직접 계산)</li></ol></div>
+        <div><div class="intro-h">AI를 검증하는 3단계</div><ol class="intro-flow">
+          <li><b>데이터 대조</b> AI 문장 속 숫자를 AI가 본 실제 데이터와 자동 비교, 오래된 데이터는 경고</li>
+          <li><b>증권사 리포트 대조</b> 같은 날 리포트와 결론·근거 비교</li>
+          <li><b>사후 채점</b> 5거래일 뒤 실제 결과로 AI·BULL·BEAR 적중률 자동 채점</li></ol>
+          <p class="muted small">사람은 결론을 직접 쓰고, AI와 비교하며 판단력을 훈련합니다. 투자 권유가 아닌 학습용 도구예요.</p></div>
+      </div>
+      <div class="intro-links"><a href="#" data-act="goto-records">성과·인사이트 보기 →</a><a href="https://github.com/choigaa0-rgb/macro-daily#readme" target="_blank" rel="noopener">작동 원리 자세히 ↗</a></div>
+    </details>`;
+  }
+
   function renderBrief() {
     const body = $('#briefBody');
     if (!body) return;
@@ -992,7 +1015,7 @@
     const sigRows = ['curve', 'stockRate', 'alignment', 'dollar', 'korea', 'phase'].map((k) => sig[k] ? `<li><span class="sg-l">${esc(SIGNAL_TITLES[k])}</span><span class="sg-v ${sig[k].tone}">${esc(sig[k].name)}</span></li>` : '').join('');
     const sv = sig.sectors;
     const meta = `${src ? `${esc(src.source)}${src.at ? ` · ${esc(src.at)}` : ''}${src.model ? ` · ${esc(src.model)}` : ''}` : '아직 오늘 브리핑이 없습니다'}${sig.signalDate ? ` · 미국 ${esc(sig.signalDate)} 종가 기준` : ''}`;
-    body.innerHTML = `
+    body.innerHTML = `${introCard()}
       <header class="page-head">
         <div>
           <div class="ph-kicker">아침 브리핑</div>
@@ -2024,6 +2047,7 @@
         if (a === 'goto-company') { e.preventDefault(); gotoTab('company'); return; }
         if (a === 'goto-brief') { e.preventDefault(); gotoTab('brief'); return; }
         if (a === 'goto-event') { e.preventDefault(); gotoTab('event'); return; }
+        if (a === 'goto-records') { e.preventDefault(); gotoTab('records'); return; }
         if (a === 'event-pick') { const sel = $('#eventType'); if (sel) { sel.value = act.dataset.val; renderEventChecklist(); saveDraft(); toast(`이벤트를 ${act.dataset.val}(으)로 정했어요`, 'ok'); } return; }
         if (a === 'load-scores') { e.preventDefault(); loadRecords(); return; }
         if (a === 'copy-ai-concl') { e.preventDefault(); if (conclusionText(collect($('#view-daily'))) && !confirm('내 결론 칸을 AI 결론으로 바꿀까요?')) return; applyConclusion(state.aiConcl || {}, 'AI 리서치센터'); gotoTab('daily'); if ($('#myConcl')) $('#myConcl').open = true; setTimeout(() => $('#conclusionPanel').scrollIntoView({ behavior: 'smooth' }), 50); return; }
