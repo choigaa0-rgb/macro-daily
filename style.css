@@ -1327,3 +1327,14 @@ details.x-det[open] { padding-bottom: 12px; }
 .src-row a { display: block; }
 .cmp-mode { margin: 2px 0 10px; }
 #xReport [hidden] { display: none !important; }
+
+/* 자동 신호: 오늘의 뜻 한 줄 + 용어 풀이 */
+.sig-list li { display: block; padding: 9px 0; }
+.sg-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.sg-m { font-size: 12px; color: var(--ink-3); line-height: 1.45; margin-top: 3px; }
+.sg-help { margin-top: 8px; font-size: 12.5px; }
+.sg-help > summary { cursor: pointer; color: var(--accent-2); font-weight: 650; list-style: none; }
+.sg-help > summary::-webkit-details-marker { display: none; }
+.sg-help dl { margin: 8px 0 0; }
+.sg-help dt { font-weight: 700; margin-top: 8px; }
+.sg-help dd { margin: 2px 0 0; color: var(--ink-2); line-height: 1.5; }

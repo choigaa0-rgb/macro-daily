@@ -167,6 +167,16 @@
       ${notes ? `<ul class="s-notes">${notes}</ul>` : ''}
     </div>`;
   }
+  // 금융 비전공자도 읽을 수 있게 신호 이름의 일반 뜻풀이 (브리핑 '용어 풀이'와 칩 툴팁에 사용)
+  const SIGNAL_HELP = {
+    curve: '단기(2년)·장기(10년) 금리가 어떻게 같이 움직였나. 베어=금리 상승, 불=금리 하락 / 플래트닝=두 금리 차이 축소, 스티프닝=차이 확대. 베어 플래트닝은 단기금리가 더 올라 긴축 기대가 커졌다는 뜻',
+    stockRate: '금리와 주가의 조합. 금리↑·주가↑는 경기 기대에 따른 \'좋은 금리 상승\', 금리↑·주가↓는 물가·긴축 우려에 따른 \'나쁜 금리 상승\'',
+    alignment: '소형주(러셀2000)·대형주(S&P500)·다우가 고르게 움직였나. 위험선호가 넓게 퍼지면 정배열, 순서가 깨지면 역배열',
+    dollar: '달러가 왜 움직였나. 미국 금리가 올라서(금리형), 불안해서 안전자산으로(위험 회피형), 위험선호로 약세(위험 선호형) 등',
+    vix: '미국 주식시장의 공포지수 구간. 20을 넘으면 불안, 30을 넘으면 공포',
+    korea: '미국 장의 움직임이 다음 서울 장(코스피·원달러)에 같은 방향으로 이어졌나',
+    phase: '성장과 물가의 방향으로 본 경기 국면: 골디락스(성장↑물가↓), 리플레이션(성장↑물가↑), 스태그플레이션(성장↓물가↑), 디플레이션(성장↓물가↓)',
+  };
   const SIGNAL_TITLES = { curve: '커브 패턴', stockRate: '주식 × 금리 조합', alignment: '지수 배열', dollar: '달러 움직임의 원인', vix: 'VIX 구간', korea: '한국 전이', decompose: '10년물 분해', hy: '신용시장', phase: '국면 신호' };
 
   function field(f) {
@@ -288,7 +298,7 @@
     const flags = (sig.flags || []).map((f) => `<li>${esc(f)}</li>`).join('');
     const chips = ['curve', 'stockRate', 'alignment', 'dollar', 'korea'].map((k) => {
       const s = sig[k];
-      return s ? `<span class="chip ${s.tone}"><b>${esc(SIGNAL_TITLES[k])}</b> ${esc(s.name)}</span>` : '';
+      return s ? `<span class="chip ${s.tone}" title="${esc(`${s.meaning || ''}${SIGNAL_HELP[k] ? `\n\n${SIGNAL_HELP[k]}` : ''}`)}"><b>${esc(SIGNAL_TITLES[k])}</b> ${esc(s.name)}</span>` : '';
     }).join('');
     $('#overview').innerHTML = `
       <div class="ov-left">
@@ -1027,7 +1037,9 @@
     const stageName = busy ? (STAGES.find((x) => x.id === run.stage) || {}).name : '';
     const src = state.aiSrc;
     const fc = b && b['전망'] ? `<div class="fc-grid">${S.FORECASTS.map((f) => { const v = b['전망'][f.key.replace('전망_', '')]; return v ? `<div class="fc-cell"><span>${esc(f.label)}</span><b class="${v === '상승' ? 'up' : v === '하락' ? 'down' : ''}">${v === '상승' ? '▲ ' : v === '하락' ? '▼ ' : ''}${esc(v)}</b></div>` : ''; }).join('')}</div>` : '';
-    const sigRows = ['curve', 'stockRate', 'alignment', 'dollar', 'korea', 'phase'].map((k) => sig[k] ? `<li><span class="sg-l">${esc(SIGNAL_TITLES[k])}</span><span class="sg-v ${sig[k].tone}">${esc(sig[k].name)}</span></li>` : '').join('');
+    const SIG_KEYS = ['curve', 'stockRate', 'alignment', 'dollar', 'korea', 'phase'];
+    const sigRows = SIG_KEYS.map((k) => sig[k] ? `<li title="${esc(SIGNAL_HELP[k] || '')}"><div class="sg-top"><span class="sg-l">${esc(SIGNAL_TITLES[k])}</span><span class="sg-v ${sig[k].tone}">${esc(sig[k].name)}</span></div>${sig[k].meaning ? `<div class="sg-m">${esc(sig[k].meaning)}</div>` : ''}</li>` : '').join('');
+    const sigHelp = `<details class="sg-help"><summary>용어 풀이</summary><dl>${SIG_KEYS.filter((k) => SIGNAL_HELP[k]).map((k) => `<dt>${esc(SIGNAL_TITLES[k])}</dt><dd>${esc(SIGNAL_HELP[k])}</dd>`).join('')}</dl></details>`;
     const sv = sig.sectors;
     const meta = `${src ? `${esc(src.source)}${src.at ? ` · ${esc(src.at)}` : ''}${src.model ? ` · ${esc(src.model)}` : ''}` : '아직 오늘 브리핑이 없습니다'}${sig.signalDate ? ` · 미국 ${esc(sig.signalDate)} 종가 기준` : ''}`;
     body.innerHTML = `
@@ -1061,7 +1073,7 @@
 
         <section class="card span-4">
           <h2>자동 신호 <span class="muted">규칙 기반</span></h2>
-          ${sigRows ? `<ul class="sig-list">${sigRows}</ul>` : '<p class="muted">데이터를 불러오면 나옵니다.</p>'}
+          ${sigRows ? `<ul class="sig-list">${sigRows}</ul>${sigHelp}` : '<p class="muted">데이터를 불러오면 나옵니다.</p>'}
         </section>
 
         ${b ? `<section class="card span-7">
