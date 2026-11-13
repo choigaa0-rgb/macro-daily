@@ -102,6 +102,8 @@
     d.__cmpMatch = state.cmpMatch || '';
     d.__ai = state.aiText;
     d.__cmp = state.cmpText || '';
+    d.__close = state.closeText || '';
+    d.__closeMatch = state.closeMatch || '';
     d.__mode = state.authorMode || '';
     d.__debate = state.debate || null;
     d.__snap = state.briefSnap || '';
@@ -930,18 +932,28 @@
         <h2>교차검증 <span class="muted">AI 분석이 맞는지 세 가지로 확인</span></h2>
         <div class="x-sum" id="crossSum"></div>
         <details class="x-det" id="xData"><summary><b>① 데이터 대조</b><span class="muted">AI 문장 속 숫자를 실제 데이터와 비교 (자동)</span></summary><div id="crossAuto"></div></details>
-        <details class="x-det" id="xReport"><summary><b>② 증권사 리포트 대조</b><span class="muted">오늘 시황 리포트 PDF를 올려 AI 결론과 비교</span></summary>
+        <details class="x-det" id="xReport"><summary><b>② 증권사 리포트 대조</b><span class="muted">아침: 모닝 리포트와 시각 비교 · 장 마감 후: 마감 리포트로 복기</span></summary>
           <div class="report-block cross-report">
-          <ol class="steps">
-            <li><a href="https://consensus.hankyung.com/analysis/list?skinType=market" target="_blank" rel="noopener">한경컨센서스 시장 리포트</a>에서 오늘 날짜의 데일리·시황 리포트를 고릅니다. (여러 증권사 리포트를 함께 올리면 증권사 간 합의·이견도 정리합니다)</li>
-            <li>PDF를 올리거나 핵심 부분을 붙여넣고 <b>AI로 교차검증</b>을 누르면, 오늘의 결론과 일치도·다른 점·숫자 차이·보완 제안을 정리합니다.</li>
+          <div class="pillseg cmp-mode" role="group" aria-label="비교 종류">
+            <button type="button" data-act="cmp-mode" data-val="morning">아침 전망 비교</button>
+            <button type="button" data-act="cmp-mode" data-val="close">장 마감 복기</button>
+          </div>
+          <ol class="steps cmp-steps" data-mode="morning">
+            <li><a href="https://consensus.hankyung.com/analysis/list?skinType=market" target="_blank" rel="noopener">한경컨센서스 시장 리포트</a>에서 오늘 아침(장 시작 전)에 나온 <b>모닝 데일리·시황 리포트</b>를 고릅니다. 여러 증권사를 함께 올리면 증권사 간 합의·이견도 정리해요.</li>
+            <li>같은 정보(전날 미국장)로 AI와 증권사가 같은 결론을 냈는지 봅니다: 일치도·다른 점·숫자 차이·보완 제안.</li>
           </ol>
-          <label class="fld wide"><span>참고 리포트</span><input type="text" data-key="참고 리포트" placeholder="증권사 · 리포트 제목" /></label>
+          <ol class="steps cmp-steps" data-mode="close" hidden>
+            <li>한국장이 끝난 뒤(15:30 이후) 나온 <b>국내 마감 시황 리포트</b>를 고릅니다.</li>
+            <li>아침 AI 결론이 오늘 한국장을 맞혔는지, 틀렸다면 무엇을 놓쳤는지 복기합니다. 실제 종가도 함께 넣어요.</li>
+          </ol>
+          <label class="fld wide cmp-name" data-mode="morning"><span>참고 리포트 (아침)</span><input type="text" data-key="참고 리포트" placeholder="증권사 · 모닝 리포트 제목" /></label>
+          <label class="fld wide cmp-name" data-mode="close" hidden><span>참고 리포트 (장 마감)</span><input type="text" data-key="마감 참고 리포트" placeholder="증권사 · 마감 시황 제목" /></label>
           <div class="fld wide"><span>리포트 PDF (여러 개 가능 · 최대 5개 · 파일당 3MB 이하)</span>
             <div class="file-row"><input type="file" id="reportFile" accept="application/pdf" multiple /><button class="btn ghost" id="clearFile" type="button">지우기</button></div></div>
           <label class="fld wide"><span>또는 리포트 내용 붙여넣기</span><textarea id="reportText" rows="3" placeholder="리포트의 결론·전망 부분 (원문은 저장하지 않습니다)"></textarea></label>
           <button class="btn block-soft" id="compareBtn" type="button">AI로 교차검증</button>
-          <div class="ai-out" id="cmpOut"><span class="muted">리포트를 올리고 교차검증을 누르세요.</span></div>
+          <div class="ai-out cmp-out" id="cmpOut" data-mode="morning"><span class="muted">모닝 리포트를 올리고 교차검증을 누르세요.</span></div>
+          <div class="ai-out cmp-out" id="closeOut" data-mode="close" hidden><span class="muted">장 마감 리포트를 올리고 복기를 누르세요.</span></div>
           <label class="fld wide"><span>교차검증 메모</span><textarea data-key="리포트 비교 메모" rows="2" placeholder="받아들일 점 / 고칠 점"></textarea></label>
         </div>
         </details>
@@ -1104,6 +1116,7 @@
         ${v.newer ? `<p class="hint">그 뒤 새 장이 열려 지금 값이 달라진 숫자 ${v.newer}개는 '지금' 칸에 따로 표시했어요. AI의 오류가 아니라 시간 차이입니다.</p>` : ''}
         <details class="qs"><summary>대조한 숫자 전체</summary><table class="g-table">${v.list.map((x) => `<tr><th class="${x.status === '일치' ? 'hit' : x.status === '불일치' ? 'miss' : 'muted'}">${x.status === '일치' ? '✓' : x.status === '불일치' ? '✗' : '?'}</th><td>${esc(x.text)}</td><td>${esc(x.actual || x.status)}${asOf(x)}</td>${nowC(x)}</tr>`).join('')}</table></details>`}`}`;
     if (state.cmpText && $('#cmpOut') && !$('#cmpOut').dataset.filled) { $('#cmpOut').innerHTML = renderMarkdown(state.cmpText); $('#cmpOut').dataset.filled = '1'; }
+    if (state.closeText && $('#closeOut') && !$('#closeOut').dataset.filled) { $('#closeOut').innerHTML = renderMarkdown(state.closeText); $('#closeOut').dataset.filled = '1'; }
     const sc = $('#crossScore');
     if (!sc) return;
     const a = state.scored && state.actorScores;
@@ -1120,8 +1133,8 @@
     if (!box) return;
     const tone = (t) => (t === 'good' ? 'good' : t === 'bad' ? 'bad' : t === 'warn' ? 'warn' : '');
     const d = !v ? ['대기', 'AI 브리핑이 나오면 자동 대조', ''] : !v.list.length ? ['-', '대조할 숫자 없음', ''] : v.bad ? [`불일치 ${v.bad}건`, `숫자 ${v.list.length}개 중 일치 ${v.ok}`, 'bad'] : [`모두 일치`, `숫자 ${v.list.length}개 확인`, 'good'];
-    const m = state.cmpMatch;
-    const r = m ? [m, '오늘 리포트와 비교함', m === '일치' ? 'good' : m === '불일치' ? 'bad' : 'warn'] : ['아직 안 함', 'PDF를 올려 비교하기', ''];
+    const m = state.cmpMatch, cm = state.closeMatch;
+    const r = m || cm ? [m || '아침 비교 전', cm ? `장 마감 복기: 한국장 ${cm}` : '모닝 리포트와 비교함', (m || cm) === '일치' || cm === '맞음' ? 'good' : m === '불일치' || cm === '틀림' ? 'bad' : 'warn'] : ['아직 안 함', '아침: 모닝 리포트 · 마감 후: 복기', ''];
     const ai = a && a.byActor && a.byActor.AI;
     const sc = ai && ai.total ? [pct(ai), `AI 전망 ${ai.hit}/${ai.total} 적중${ai.pending ? ` · 대기 ${ai.pending}` : ''}`, ''] : ['-', a ? '채점할 기록이 아직 없음' : '눌러서 적중률 보기', ''];
     const cell = (no, label, [val, sub, t], target) => `<button type="button" class="x-cell ${tone(t)}" data-act="x-open" data-val="${target}">
@@ -1366,6 +1379,36 @@
   }
 
   // ---------- 리포트 비교 ----------
+  // 리포트 대조 종류: 아침 전망 비교(모닝 리포트) / 장 마감 복기(국내 마감 리포트). 서로 덮어쓰지 않게 따로 저장
+  function defaultCmpMode() {
+    const kst = new Date(Date.now() + 9 * 3600000);
+    const mins = kst.getUTCHours() * 60 + kst.getUTCMinutes();
+    return state.date === todayKST() && mins >= 15 * 60 + 30 ? 'close' : 'morning';
+  }
+  function setCmpMode(mode) {
+    state.cmpMode = mode === 'close' ? 'close' : 'morning';
+    $$('#xReport [data-mode]').forEach((el) => { el.hidden = el.dataset.mode !== state.cmpMode; });
+    $$('#xReport [data-act="cmp-mode"]').forEach((b) => b.classList.toggle('on', b.dataset.val === state.cmpMode));
+    const btn = $('#compareBtn');
+    if (btn && !btn.disabled) {
+      const done = state.cmpMode === 'close' ? state.closeText : state.cmpText;
+      btn.textContent = state.cmpMode === 'close' ? (done ? 'AI로 다시 복기하기' : 'AI로 장 마감 복기') : (done ? 'AI로 다시 비교하기' : 'AI로 교차검증');
+    }
+  }
+  // 장 마감 복기에 함께 넣는 실제 숫자 (한국은 오늘 종가가 들어왔는지 날짜로 확인)
+  function actualKoreaText() {
+    if (!state.market) return '';
+    const it = state.market.items;
+    const md = (d) => (d ? d.slice(5).replace('-', '/') : '-');
+    return ['kospi', 'kosdaq', 'usdkrw', 'kr3y', 'kr10y'].map((id) => {
+      const x = it[id];
+      const def = C.indicators[id];
+      if (!x || !x.ok || !def) return '';
+      const u = x.chgUnit === 'bp' ? 'bp' : '%';
+      return `- ${def.label}: ${x.value} (${x.chg > 0 ? '+' : ''}${x.chg}${u}) [${md(x.date)} 종가]`;
+    }).filter(Boolean).join('\n');
+  }
+
   async function runCompare() {
     const d = Object.assign(collect($('#view-daily')), collect($('#view-brief')));
     const mine = conclusionText(collect($('#view-daily')));
@@ -1384,14 +1427,18 @@
       r.onerror = () => rej(new Error(`${file.name} 파일을 읽지 못했습니다`));
       r.readAsDataURL(file);
     });
+    const mode = state.cmpMode || 'morning';
+    const close = mode === 'close';
+    const outEl = close ? $('#closeOut') : $('#cmpOut');
     const btn = $('#compareBtn');
-    btn.disabled = true; btn.textContent = '비교 중…';
-    const status = (m) => { $('#cmpOut').innerHTML = `<span class="muted">${esc(m)}</span>`; };
-    status('AI가 리포트를 읽고 결론과 비교하고 있습니다…');
+    btn.disabled = true; btn.textContent = close ? '복기 중…' : '비교 중…';
+    const status = (m) => { outEl.innerHTML = `<span class="muted">${esc(m)}</span>`; };
+    status(close ? 'AI가 마감 리포트·실제 종가로 아침 결론을 복기하고 있습니다…' : 'AI가 리포트를 읽고 결론과 비교하고 있습니다…');
     const names = files.map((f) => f.name.replace(/\.pdf$/i, '')).join(', ');
-    const reportName = d['참고 리포트'] || names;
-    const nameInput = $('#view-brief [data-key="참고 리포트"]');
-    if (!d['참고 리포트'] && names && nameInput) nameInput.value = names; // 시트에 어떤 리포트와 비교했는지 남김
+    const nameKey = close ? '마감 참고 리포트' : '참고 리포트';
+    const reportName = d[nameKey] || names;
+    const nameInput = $(`#view-brief [data-key="${nameKey}"]`);
+    if (!d[nameKey] && names && nameInput) nameInput.value = names; // 시트에 어떤 리포트와 비교했는지 남김
     try {
       const pdfs = [];
       for (const f of files) pdfs.push({ name: f.name, data: await readB64(f) });
@@ -1415,17 +1462,24 @@
         status('정리한 리포트들을 결론과 비교하고 있습니다…');
         body = { reportText: [sums.join('\n\n'), text && `[붙여넣은 내용]\n${text}`].filter(Boolean).join('\n\n') };
       }
-      const j = await api('/api/compare', { method: 'POST', body: JSON.stringify(Object.assign({ date: state.date, reportName, conclusionText: concl, signalsText: signalsText() }, body)) });
-      state.cmpText = j.text;
-      const mm = /일치도\s*[:：]\s*(부분 일치|불일치|일치)/.exec(j.text);
-      state.cmpMatch = mm ? mm[1] : '';
-      $('#cmpOut').innerHTML = renderMarkdown(j.text) + `<div class="ai-meta">모델: ${esc(j.model)} · 리포트 원문은 저장하지 않고 비교 결과만 저장합니다. <button class="btn mini" data-act="cmp-to-memo" type="button">비교 메모에 옮기기</button></div>`;
+      const j = await api('/api/compare', { method: 'POST', body: JSON.stringify(Object.assign({ date: state.date, reportName, conclusionText: concl, signalsText: signalsText() }, close ? { mode: 'close', actualText: actualKoreaText() } : {}, body)) });
+      if (close) {
+        state.closeText = j.text;
+        const mm = /한국장 판단\s*[:：]\s*(맞음|부분|틀림)/.exec(j.text);
+        state.closeMatch = mm ? mm[1] : '';
+      } else {
+        state.cmpText = j.text;
+        const mm = /일치도\s*[:：]\s*(부분 일치|불일치|일치)/.exec(j.text);
+        state.cmpMatch = mm ? mm[1] : '';
+      }
+      outEl.innerHTML = renderMarkdown(j.text) + `<div class="ai-meta">모델: ${esc(j.model)} · 리포트 원문은 저장하지 않고 결과만 저장합니다. <button class="btn mini" data-act="cmp-to-memo" type="button">비교 메모에 옮기기</button></div>`;
       saveDraft();
       renderBrief();
     } catch (e) {
-      $('#cmpOut').innerHTML = `<div class="err">${esc(e.message)}</div>`;
+      outEl.innerHTML = `<div class="err">${esc(e.message)}</div>`;
     } finally {
-      btn.disabled = false; btn.textContent = 'AI로 다시 비교하기';
+      btn.disabled = false;
+      setCmpMode(mode);
     }
   }
 
@@ -1646,6 +1700,8 @@
     let ok = 0, bad = 0, days = 0, badDays = 0;
     recs.forEach((r) => { const m = /일치 (\d+) · 불일치 (\d+)/.exec(r['교차검증_데이터'] || ''); if (m) { days++; ok += +m[1]; bad += +m[2]; if (+m[2]) badDays++; } });
     const warnDays = recs.filter((r) => r['한국 데이터 경고']).length;
+    const closeRs = recs.map((r) => r['장 마감 복기 결과']).filter(Boolean);
+    const closeHit = closeRs.filter((x) => x === '맞음').length, closePart = closeRs.filter((x) => x === '부분').length;
 
     // 2) 판단·국면·증권사 일치도별 AI 적중률
     const hitBy = (keyFn) => {
@@ -1678,6 +1734,8 @@
       <div class="ins-grid">
         <div class="ins"><div class="ins-l">AI 숫자 정확도</div><div class="ins-v">${ok + bad ? pctS(ok, ok + bad) : '–'}</div>
           <div class="ins-s">${days ? `${days}일 동안 AI 문장 속 숫자 ${ok + bad}개 대조 · 틀린 날 ${badDays}일` : '대조 기록이 쌓이면 나와요'}</div></div>
+        <div class="ins"><div class="ins-l">AI 한국장 당일 판단</div><div class="ins-v">${closeRs.length ? pctS(closeHit + closePart * 0.5, closeRs.length) : '–'}</div>
+          <div class="ins-s">${closeRs.length ? `장 마감 복기 ${closeRs.length}일 · 맞음 ${closeHit} · 부분 ${closePart} · 틀림 ${closeRs.length - closeHit - closePart} (부분은 절반으로 계산)` : '장 마감 복기를 하면 쌓여요'}</div></div>
         <div class="ins"><div class="ins-l">한국 데이터 지연 감지</div><div class="ins-v">${warnDays}일</div>
           <div class="ins-s">AI가 오래된 한국 데이터를 볼 뻔한 날 (경고를 붙여 단정하지 않게 함)</div></div>
         ${strong ? `<div class="ins"><div class="ins-l">가장 뚜렷한 미국 → 한국 전이</div><div class="ins-v">${T.base.down}% <small>→</small> ${strong.down}%</div>
@@ -1919,6 +1977,8 @@
     }
     rec['AI 종합분석'] = state.aiText || '';
     rec['AI 리포트 비교'] = state.cmpText || '';
+    rec['장 마감 복기'] = state.closeText || '';
+    rec['장 마감 복기 결과'] = state.closeMatch || '';
     rec['작성 방식'] = authorMode();
     const AC = state.aiConcl;
     rec['AI 결론 JSON'] = AC ? JSON.stringify(AC) : '';
@@ -2064,12 +2124,13 @@
         if (a === 'goto-brief') { e.preventDefault(); gotoTab('brief'); return; }
         if (a === 'goto-event') { e.preventDefault(); gotoTab('event'); return; }
         if (a === 'goto-records') { e.preventDefault(); gotoTab('records'); return; }
+        if (a === 'cmp-mode') { setCmpMode(act.dataset.val); saveDraft(); return; }
         if (a === 'event-pick') { const sel = $('#eventType'); if (sel) { sel.value = act.dataset.val; renderEventChecklist(); saveDraft(); toast(`이벤트를 ${act.dataset.val}(으)로 정했어요`, 'ok'); } return; }
         if (a === 'load-scores') { e.preventDefault(); loadRecords(); return; }
         if (a === 'copy-ai-concl') { e.preventDefault(); if (conclusionText(collect($('#view-daily'))) && !confirm('내 결론 칸을 AI 결론으로 바꿀까요?')) return; applyConclusion(state.aiConcl || {}, 'AI 리서치센터'); gotoTab('daily'); if ($('#myConcl')) $('#myConcl').open = true; setTimeout(() => $('#conclusionPanel').scrollIntoView({ behavior: 'smooth' }), 50); return; }
         if (a === 'debate-resume') { const f = (state.debateRun || {}).failed; f === 'chief' ? runChief() : runDebate(f); return; }
         if (act.dataset.act === 'cmp-to-memo') {
-          const plain = (state.cmpText || '').replace(/^#+\s*/gm, '').replace(/\*\*/g, '');
+          const plain = ((state.cmpMode === 'close' ? state.closeText : state.cmpText) || '').replace(/^#+\s*/gm, '').replace(/\*\*/g, '');
           setField('리포트 비교 메모', plain, 'append');
         } else guideAction(act.dataset.act, act.dataset.val);
         return;
@@ -2112,6 +2173,8 @@
     state.aiText = draft.__ai || '';
     $('#aiOut').innerHTML = state.aiText ? renderMarkdown(state.aiText) : '<span class="muted">아직 분석하지 않았습니다.</span>';
     state.cmpText = draft.__cmp || '';
+    state.closeText = draft.__close || '';
+    state.closeMatch = draft.__closeMatch || '';
     state.authorMode = draft.__mode || '';
     state.debate = draft.__debate || null;
     state.debateRun = {};
@@ -2127,6 +2190,8 @@
     setTimeout(() => { loadIndustry(true); loadCompany(true); }, 0);
     setTimeout(updateModeTag, 0);
     if (state.cmpText) $('#cmpOut').innerHTML = renderMarkdown(state.cmpText);
+    if (state.closeText && $('#closeOut')) $('#closeOut').innerHTML = renderMarkdown(state.closeText);
+    setCmpMode(state.closeText && !state.cmpText ? 'close' : defaultCmpMode());
     if (fetchData) loadMarket(); else rerenderData(false);
   }
 
