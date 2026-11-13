@@ -1338,3 +1338,8 @@ details.x-det[open] { padding-bottom: 12px; }
 .sg-help dl { margin: 8px 0 0; }
 .sg-help dt { font-weight: 700; margin-top: 8px; }
 .sg-help dd { margin: 2px 0 0; color: var(--ink-2); line-height: 1.5; }
+/* 뜻은 한 줄로(전체는 마우스를 올리면), 용어 풀이는 레이아웃을 밀지 않는 팝업으로 */
+.sg-m { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.sg-help { position: relative; }
+.sg-help[open] dl { position: absolute; z-index: 30; right: 0; bottom: calc(100% + 6px); width: min(360px, 86vw); max-height: 380px; overflow: auto;
+  background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-s); box-shadow: 0 10px 30px rgba(0,0,0,.12); padding: 6px 14px 12px; }
