@@ -387,7 +387,15 @@
               status = Math.abs(it.chg - n) <= 0.11 ? '일치' : '불일치';
             } else if (unit === '%' && it.chgUnit === 'bp' && !signed && !m[3]) {
               actual = `${it.value}%`; // 금리 수준
-              status = Math.abs(it.value - n) <= 0.03 ? '일치' : '불일치';
+              // "5% 돌파", "4%대", "5% 부근"처럼 기준선을 말한 경우는 정확한 값이 아니라 방향·범위로 확인
+              const after = text.slice(at + m[0].length, at + m[0].length + 8);
+              const th = /^\s*(?:선|대)?\s*(?:을|를|에|로|이|가)?\s*(상향\s*)?(돌파|상회|넘|웃돌|위로|위에|위)/.test(after) ? 'over'
+                : /^\s*(?:선|대)?\s*(?:을|를|에|로|이|가)?\s*(하향\s*)?(하회|밑돌|아래|붕괴|하향\s*돌파)/.test(after) ? 'under'
+                : /^\s*(대|선|부근|근처|수준|안팎|가까이|근접)/.test(after) ? 'near' : '';
+              if (th === 'over') status = it.value >= n - 0.005 ? '일치' : '불일치';
+              else if (th === 'under') status = it.value <= n + 0.005 ? '일치' : '불일치';
+              else if (th === 'near') status = /^\s*대/.test(after) ? (Math.floor(it.value) === Math.floor(n) ? '일치' : '불일치') : Math.abs(it.value - n) <= 0.15 ? '일치' : '불일치';
+              else status = Math.abs(it.value - n) <= 0.03 ? '일치' : '불일치';
             }
             if (status === '일치') break;
           }

@@ -183,6 +183,15 @@ module.exports = async (req, res) => {
       // AI가 이때 본 숫자: 대시보드의 데이터 대조가 '나중 데이터'가 아니라 이것과 비교함
       '데이터 스냅샷': JSON.stringify(S.snapshot(market.items)),
     };
+    // 데이터 대조도 아침에 바로 기록 (대시보드에서 저장을 안 한 날에도 'AI 숫자 오류' 기록이 남도록)
+    const allText = [
+      chief ? Object.entries(chief).filter(([k, v]) => typeof v === 'string').map(([k, v]) => `${k}: ${v}`).join('\n') : '',
+      ...['bull', 'bear'].map((k) => (D && D[k] ? [D[k].claim, ...(D[k].points || []), D[k].korea].filter(Boolean).join('\n') : '')),
+      D && D.risk ? [D.risk.reason, D.risk.key_issue, D.risk.bull_wrong_if, D.risk.bear_wrong_if].filter(Boolean).join('\n') : '',
+    ].filter(Boolean).join('\n');
+    const vv = S.verifyClaims(allText, S.snapshot(market.items));
+    const bad = vv.filter((x) => x.status === '불일치');
+    record['교차검증_데이터'] = vv.length ? `일치 ${vv.filter((x) => x.status === '일치').length} · 불일치 ${bad.length}${bad.length ? ` (${bad.map((x) => x.text).join(', ')})` : ''}` : '';
     // 출처별 5거래일 전망 (나중에 자동 채점)
     ['미국10년물', 'S&P500', '원달러', 'KOSPI'].forEach((k) => {
       record[`AI전망_${k}`] = chief && chief['전망'] ? chief['전망'][k] || '' : '';

@@ -67,6 +67,7 @@ function call(query, headers = {}) {
   const snap = JSON.parse(rec['데이터 스냅샷']);
   assert.ok(snap.kospi && snap.kospi.date && snap.us10y && snap.us10y.chg != null);
   assert.strictEqual(rec['한국 기준일'], snap.kospi.date);
+  assert.ok('교차검증_데이터' in rec);
   assert.ok(lastPrompt.includes('[한국 데이터 시점]') && lastPrompt.includes('KOSPI') && lastPrompt.includes('종가]'));
   console.log('ok - 아침 브리핑: AI가 본 데이터 스냅샷·한국 기준일 저장, 한국 데이터 시점 안내');
 

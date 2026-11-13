@@ -1549,6 +1549,7 @@
       const r = map.get(a['날짜']) || { '날짜': a['날짜'], '작성 방식': 'AI 자동' };
       Object.keys(a).forEach((k) => { if (/^(AI|BULL|BEAR)전망_/.test(k) && !r[k] && a[k]) r[k] = a[k]; });
       if (!r['AI 종합 해석'] && a['AI 종합 해석']) r['AI 종합 해석'] = a['AI 종합 해석'];
+      ['교차검증_데이터', '한국 데이터 경고', '한 줄 요약', '리스크팀 판단', '신호 기준일'].forEach((k) => { if (!r[k] && a[k]) r[k] = a[k]; });
       map.set(a['날짜'], r);
     });
     return [...map.values()].sort((x, y) => String(y['날짜']).localeCompare(String(x['날짜'])));
