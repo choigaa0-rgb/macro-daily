@@ -1320,3 +1320,8 @@ details.x-det[open] { padding-bottom: 12px; }
   .brand { padding: 0 2px; }
   .date-pick input { max-width: 140px; }
 }
+.src-more { width: 100%; }
+.src-more > summary { cursor: pointer; color: var(--accent-2); font-weight: 650; list-style: none; }
+.src-more > summary::-webkit-details-marker { display: none; }
+.src-more[open] { display: flex; flex-direction: column; gap: 4px; }
+.src-row a { display: block; }

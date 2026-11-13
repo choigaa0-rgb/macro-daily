@@ -241,7 +241,10 @@
 
   function renderDaily() {
     const sig = state.signals || {};
-    $('#dailySections').innerHTML = C.daily.map((sec) => {
+    // 화면 배치 순서대로 그리고 번호도 그 순서로 매김 (예전엔 CSS로 순서만 바꿔 번호가 01·02·04·03…으로 뒤섞여 보였음)
+    const SEC_ORDER = ['rates', 'fx', 'commodity', 'equity', 'korea', 'risk', 'policy', 'data'];
+    const secRank = (s) => { const i = SEC_ORDER.indexOf(s.id); return i < 0 ? 99 : i; };
+    $('#dailySections').innerHTML = C.daily.slice().sort((a, b) => secRank(a) - secRank(b)).map((sec, secIdx) => {
       const tiles = sec.items.map((id) => tile(id, 'daily')).join('');
       const sigs = sec.signals.map((k) => signalBox(SIGNAL_TITLES[k], sig[k])).join('');
       const manual = (sec.manual || []).map(field).join('');
@@ -264,7 +267,7 @@
       const links = sec.links.map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join('');
       return `<article class="card sec" id="sec-${sec.id}">
         <header class="sec-head">
-          <span class="sec-no">${String(sec.no).padStart(2, '0')}</span>
+          <span class="sec-no">${String(secIdx + 1).padStart(2, '0')}</span>
           <div class="sec-titles"><h2>${esc(sec.title)}</h2><p>${esc(sec.lead)}</p></div>
         </header>
         ${tiles ? `<div class="tiles">${tiles}</div>` : ''}
@@ -1200,7 +1203,13 @@
         ${it.why ? `<p class="muted"><b>왜 중요한가</b> ${esc(it.why)}</p>` : ''}
         ${it.macro_link ? `<p class="macro-l"><b>매크로 연결</b> ${esc(it.macro_link)}</p>` : ''}
         ${it.companies && it.companies.length ? `<p><b>관련 기업</b> ${it.companies.map((c) => `<span class="chip ${c.inSource ? '' : 'warn'}" title="${c.inSource ? '근거 기사에 나옴' : '근거 기사에 없음 — 확인 필요'}">${esc(c.name)}${c.inSource ? '' : ' ?'}</span>`).join(' ')}</p>` : ''}
-        <div class="src-row"><span class="badge ${it.check === '근거 확인' ? 'good' : 'warn'}">${esc(it.check)}</span> ${it.links.map((l) => `<a href="${esc(l.link)}" target="_blank" rel="noopener">${esc(l.source)}: ${esc(l.title.slice(0, 40))}</a>`).join('')}</div>
+        ${(() => {
+          // 근거 기사가 많은 이슈는 카드가 길어지므로 3건만 보이고 나머지는 접음
+          const a = (l) => `<a href="${esc(l.link)}" target="_blank" rel="noopener">${esc(l.source)}: ${esc(l.title.slice(0, 40))}</a>`;
+          const head = it.links.slice(0, 3).map(a).join('');
+          const rest = it.links.slice(3);
+          return `<div class="src-row"><span class="badge ${it.check === '근거 확인' ? 'good' : 'warn'}">${esc(it.check)}</span> ${head}${rest.length ? `<details class="src-more"><summary>근거 기사 ${rest.length}건 더</summary>${rest.map(a).join('')}</details>` : ''}</div>`;
+        })()}
       </div>`).join('') : ''}
       ${I && I.feedErrors && I.feedErrors.length ? `<p class="muted">일부 RSS를 읽지 못했습니다: ${esc(I.feedErrors.join(' · '))}</p>` : ''}`;
   }
