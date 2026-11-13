@@ -7,7 +7,7 @@
 // 교차검증: AI 문장에 나온 숫자가 제공한 데이터에 있는지 자동 대조, 관련 뉴스·공시 링크로 사실 확인 가능하게 함.
 // 투자 권유가 아닌 분석 카드: BULL·BEAR 논거와 체크포인트를 나란히 보여줌.
 
-const { NEED_PASS, sendJson, isAuthorized, readBody, callGemini, sheetPost, sheetRows, parseJsonLoose, kstDate } = require('./_lib');
+const { NEED_PASS, sendJson, isAuthorized, demoGate, readBody, callGemini, sheetPost, sheetRows, parseJsonLoose, kstDate } = require('./_lib');
 const D = require('./_data');
 
 const PROMPT = `너는 한국 증권사 리서치센터의 기업 애널리스트다. 주어진 데이터로 기업 1곳의 '스톡피치 형식 분석 카드'를 만든다.
@@ -231,6 +231,7 @@ module.exports = async (req, res) => {
       const sel = await pickToday({ news: news.items, issuesRow: issues.find((r) => r['날짜'] === date) });
       return sendJson(res, 200, { ok: true, rank: sel.rank, pick: sel.pick, recent: sel.recent, universe: D.UNIVERSE.map((c) => ({ ticker: c.ticker, name: c.name, market: c.market })) });
     }
+    if (!demoGate(req, res, 'heavy')) return;
     let body = {};
     if (req.method === 'POST') { try { body = await readBody(req); } catch (e) { body = {}; } }
     const result = await buildCard({ ticker: body.ticker || url.searchParams.get('ticker'), auto: !body.ticker, save: who === 'admin' });

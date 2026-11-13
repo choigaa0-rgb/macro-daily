@@ -4,7 +4,7 @@
 //
 // POST /api/debate { stage: 'open' | 'rebut' | 'risk' | 'chief', date, analystText, dataText, manualText, previousText, debate }
 
-const { sendJson, checkPasscode, readBody, callGemini } = require('./_lib');
+const { sendJson, checkPasscode, demoGate, readBody, callGemini } = require('./_lib');
 const { fetchNews, marketHeadlines, headlinesText } = require('./_data');
 
 const COMMON = `너는 한국 증권사 리서치센터의 데일리 매크로 토론을 진행한다.
@@ -98,6 +98,7 @@ function debateText(d) {
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'POST만 가능합니다' });
   if (!checkPasscode(req, res)) return;
+  if (!demoGate(req, res, 'heavy')) return;
   let body;
   try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { ok: false, error: '요청 형식 오류' }); }
   const stage = body.stage;

@@ -2,7 +2,7 @@
 // "AI의 종합 해석"과 "내 결론과의 비교 피드백"을 받아옵니다.
 // 필요한 환경변수: GEMINI_API_KEY (Google AI Studio에서 무료 발급), GEMINI_MODEL(선택)
 
-const { sendJson, checkPasscode, readBody, callGemini } = require('./_lib');
+const { sendJson, checkPasscode, demoGate, readBody, callGemini } = require('./_lib');
 
 const SYSTEM_PROMPT = `너는 한국 증권사 리서치센터의 시니어 매크로 애널리스트다.
 금융권 취업을 준비하는 경영학부 학생이 매일 수행하는 데일리 매크로 점검 결과를 검토한다.
@@ -69,6 +69,7 @@ function parseJson(text) {
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'POST만 가능합니다' });
   if (!checkPasscode(req, res)) return;
+  if (!demoGate(req, res, 'light')) return;
 
   let body;
   try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { ok: false, error: '요청 형식 오류' }); }

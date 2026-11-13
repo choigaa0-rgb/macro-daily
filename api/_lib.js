@@ -32,6 +32,30 @@ function checkPasscode(req, res, { allowDemo = true } = {}) {
   return null;
 }
 
+// 체험 모드(비밀번호 없이 들어온 사람)의 AI 사용 제한: 무료 Gemini 사용량을 지켜 아침 자동 브리핑이 멈추지 않게 함
+//  - heavy(브리핑 토론·산업 이슈·기업 카드 새로 만들기): 기본으로 막고 저장된 결과를 보게 함 (DEMO_HEAVY=1 이면 허용)
+//  - light(증권사 리포트 교차검증·AI 분석): 사람(IP)당 시간당 DEMO_IP_PER_HOUR(기본 5)회, 서버당 하루 DEMO_DAILY(기본 40)회
+//  - DEMO_AI=0 이면 체험 모드 AI를 모두 끔
+// 서버(함수 인스턴스)마다 따로 세는 간단한 제한이라 완벽하진 않지만, 무분별한 반복 호출은 막습니다.
+const DEMO_HEAVY_MSG = '체험 모드에서는 매일 아침 자동으로 만든 결과를 보여드려요. \'불러오기\'로 확인하세요. (새로 만들기는 관리자만 가능)';
+const DEMO_LIMIT_MSG = '체험 모드의 AI 사용 횟수를 다 썼어요. 잠시 뒤 다시 시도하거나, 저장된 결과를 불러와 보세요.';
+const demoCount = { day: '', total: 0, ip: new Map() };
+function demoGate(req, res, kind = 'light') {
+  if (role(req) !== 'demo') return true;
+  if (process.env.DEMO_AI === '0') { sendJson(res, 403, { ok: false, error: DEMO_LIMIT_MSG }); return false; }
+  if (kind === 'heavy' && process.env.DEMO_HEAVY !== '1') { sendJson(res, 403, { ok: false, error: DEMO_HEAVY_MSG }); return false; }
+  const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  if (demoCount.day !== today) { demoCount.day = today; demoCount.total = 0; demoCount.ip.clear(); }
+  const perHour = Number(process.env.DEMO_IP_PER_HOUR || 5);
+  const perDay = Number(process.env.DEMO_DAILY || 40);
+  const ip = String(req.headers['x-forwarded-for'] || req.socket && req.socket.remoteAddress || 'x').split(',')[0].trim();
+  const now = Date.now();
+  const hits = (demoCount.ip.get(ip) || []).filter((t) => now - t < 3600000);
+  if (demoCount.total >= perDay || hits.length >= perHour) { sendJson(res, 429, { ok: false, error: DEMO_LIMIT_MSG }); return false; }
+  hits.push(now); demoCount.ip.set(ip, hits); demoCount.total++;
+  return true;
+}
+
 async function fetchWithTimeout(url, options = {}, ms = 9000) {
   return fetch(url, { ...options, signal: AbortSignal.timeout(ms) });
 }
@@ -196,4 +220,4 @@ function parseJsonLoose(text) {
 }
 const kstDate = () => new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
 
-module.exports = { NEED_PASS, DEMO_NO_SAVE, role, sendJson, checkPasscode, fetchWithTimeout, readBody, callGemini, listModels, pickLight, sheetPost, sheetRows, isAuthorized, parseJsonLoose, kstDate };
+module.exports = { NEED_PASS, DEMO_NO_SAVE, demoGate, role, sendJson, checkPasscode, fetchWithTimeout, readBody, callGemini, listModels, pickLight, sheetPost, sheetRows, isAuthorized, parseJsonLoose, kstDate };

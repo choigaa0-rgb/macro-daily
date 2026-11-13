@@ -3,7 +3,7 @@
 // mode: 'close' → 장 마감 복기 (아침 결론을 국내 마감 리포트·실제 종가와 맞춰 봄)
 // 필요한 환경변수: GEMINI_API_KEY, GEMINI_MODEL(선택)
 
-const { sendJson, checkPasscode, readBody, callGemini } = require('./_lib');
+const { sendJson, checkPasscode, demoGate, readBody, callGemini } = require('./_lib');
 
 const SYSTEM_PROMPT = `너는 한국 증권사 리서치센터의 시니어 매크로 애널리스트다.
 대시보드가 만든 오늘의 매크로 결론(AI 센터장 결론, 사용자 결론이 있으면 함께)을 같은 날 증권사 시황·매크로 리포트와 교차검증한다.
@@ -76,6 +76,7 @@ const MAX_B64 = 4.2 * 1024 * 1024;
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'POST만 가능합니다' });
   if (!checkPasscode(req, res)) return;
+  if (!demoGate(req, res, 'light')) return;
 
   let body;
   try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { ok: false, error: '요청 형식 오류 (PDF가 너무 크면 핵심 부분을 붙여넣어 주세요)' }); }
