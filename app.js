@@ -222,7 +222,17 @@
       : `<p class="err small">${esc(S0.error || '불러오지 못했습니다')}</p>`;
     else body = sectorBars(S0.rows, key, kind === 'us' ? (r) => r.ko : (r) => r.name);
     const meta = S0 && S0.ok ? `${esc(S0.date || '')}${S0.date ? `(${'일월화수목금토'[new Date(S0.date + 'T00:00:00Z').getUTCDay()]})` : ''} ${S0.live ? '장중' : '종가'}${key === 'w1' && S0.weekBase ? ` · ${esc(S0.weekBase)} 종가 대비 5거래일` : ''}` : '';
-    return `<div class="sec-panel"><div class="sp-head"><b>${title}</b><span class="muted small">${meta}</span></div>${body}
+    // 한국 업종(KRX Open API)은 그날 자료를 다음 날 아침에 공개 → 장 마감 뒤에도 하루 전 자료가 보이는 시간대를 안내
+    let lag = '';
+    if (kind === 'kr' && S0 && S0.ok && S0.date) {
+      const kst = new Date(Date.now() + 9 * 3600000);
+      const want = new Date(kst);
+      if (kst.getUTCHours() * 60 + kst.getUTCMinutes() < 15 * 60 + 40) want.setUTCDate(want.getUTCDate() - 1);
+      while ([0, 6].includes(want.getUTCDay())) want.setUTCDate(want.getUTCDate() - 1);
+      const wd = want.toISOString().slice(0, 10);
+      if (S0.date < wd) lag = `<p class="warn-line small">${esc(wd.slice(5).replace('-', '/'))} 장 업종 등락은 KRX가 다음 날 아침에 공개해요. 지금은 ${esc(S0.date.slice(5).replace('-', '/'))} 기준이에요. 오늘 숫자는 아래 KRX 전체지수 시세에서 보세요.</p>`;
+    }
+    return `<div class="sec-panel"><div class="sp-head"><b>${title}</b><span class="muted small">${meta}</span></div>${lag}${body}
       <div class="sp-foot muted small">${S0 && S0.ok ? esc(S0.source) + ' · ' : ''}원자료 ${link}${kind === 'us' ? '<br>미국 장이 열려 있으면 장중 가격, 닫혀 있으면 종가 기준이에요. State Street 섹터 트래커는 이 화면과 같은 ETF 기준이라 증권사 리포트 숫자와 맞춰 보기 좋아요. Finviz는 섹터 안 모든 미국 종목을 시가총액대로 계산해(예: 알파벳 비중이 큼) 순위가 다를 수 있어요.' : ''}</div></div>`;
   }
   function renderSectors() {
