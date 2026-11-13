@@ -1306,10 +1306,11 @@ details.x-det[open] { padding-bottom: 12px; }
 .cal-card.span-5 .cal-row > summary { gap: 8px; }
 .cal-card.span-5 .ind-tag { display: none; }
 .cal-note { margin-top: 8px; }
-.co-mini-m { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin: 10px 0; }
+.co-mini-m { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
 .co-mini-m > div { background: var(--line-2); border-radius: var(--radius-s); padding: 8px 10px; }
 .co-mini-m span { display: block; font-size: 11.5px; color: var(--ink-2); }
 .co-mini-m b { font-size: 15px; }
 .rec-list td.mono, .score-list td.mono { white-space: nowrap; }
 .rec-list th { white-space: nowrap; }
 .ins-v small { font-size: 16px; color: var(--ink-2); font-weight: 600; }
+@media (max-width: 760px) { .co-mini-m { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
