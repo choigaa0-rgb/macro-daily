@@ -213,7 +213,7 @@
     const key = state.secPeriod || 'd1';
     const title = kind === 'us' ? '미국 섹터' : '한국 코스피 업종';
     const link = kind === 'us'
-      ? '<a href="https://www.sectorspdrs.com/" target="_blank" rel="noopener">Sector SPDR 공식 (같은 기준)</a> · <a href="https://finviz.com/groups.ashx?g=sector&v=140&o=name" target="_blank" rel="noopener">Finviz Groups</a>'
+      ? '<a href="https://www.ssga.com/us/en/intermediary/resources/sector-tracker" target="_blank" rel="noopener">State Street 섹터 트래커 (같은 기준)</a> · <a href="https://finviz.com/groups.ashx?g=sector&v=140&o=name" target="_blank" rel="noopener">Finviz Groups</a>'
       : '<a href="https://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020103" target="_blank" rel="noopener">KRX 전체지수 시세</a>';
     let body;
     if (!S0) body = `<p class="muted small">${state.sectorBusy ? '불러오는 중…' : '데이터를 불러오면 나옵니다.'}</p>`;
@@ -223,7 +223,7 @@
     else body = sectorBars(S0.rows, key, kind === 'us' ? (r) => r.ko : (r) => r.name);
     const meta = S0 && S0.ok ? `${esc(S0.date || '')}${S0.date ? `(${'일월화수목금토'[new Date(S0.date + 'T00:00:00Z').getUTCDay()]})` : ''} ${S0.live ? '장중' : '종가'}${key === 'w1' && S0.weekBase ? ` · ${esc(S0.weekBase)} 종가 대비 5거래일` : ''}` : '';
     return `<div class="sec-panel"><div class="sp-head"><b>${title}</b><span class="muted small">${meta}</span></div>${body}
-      <div class="sp-foot muted small">${S0 && S0.ok ? esc(S0.source) + ' · ' : ''}원자료 ${link}${kind === 'us' ? '<br>미국 장이 열려 있으면 장중 가격, 닫혀 있으면 종가 기준이에요. Sector SPDR 공식 사이트는 이 화면과 같은 ETF 기준이라 증권사 리포트 숫자와 맞춰 보기 좋아요. Finviz는 섹터 안 모든 미국 종목을 시가총액대로 계산해(예: 알파벳 비중이 큼) 순위가 다를 수 있어요.' : ''}</div></div>`;
+      <div class="sp-foot muted small">${S0 && S0.ok ? esc(S0.source) + ' · ' : ''}원자료 ${link}${kind === 'us' ? '<br>미국 장이 열려 있으면 장중 가격, 닫혀 있으면 종가 기준이에요. State Street 섹터 트래커는 이 화면과 같은 ETF 기준이라 증권사 리포트 숫자와 맞춰 보기 좋아요. Finviz는 섹터 안 모든 미국 종목을 시가총액대로 계산해(예: 알파벳 비중이 큼) 순위가 다를 수 있어요.' : ''}</div></div>`;
   }
   function renderSectors() {
     const box = $('#sectorBox');
