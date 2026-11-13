@@ -1326,3 +1326,4 @@ details.x-det[open] { padding-bottom: 12px; }
 .src-more[open] { display: flex; flex-direction: column; gap: 4px; }
 .src-row a { display: block; }
 .cmp-mode { margin: 2px 0 10px; }
+#xReport [hidden] { display: none !important; }
