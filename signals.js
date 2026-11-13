@@ -406,6 +406,47 @@
     return out;
   }
 
+  // 미국 → 한국 전이 통계: 미국 장에서 큰 움직임이 있던 날, 그다음 서울 장은 어땠나 (보관 중인 약 6개월 이력)
+  const TRANSMIT = [
+    { key: 'us2y_up', label: '미국 2년물 +8bp 이상 급등', id: 'us2y', test: (c) => c >= 8, unit: 'bp' },
+    { key: 'us2y_dn', label: '미국 2년물 −8bp 이하 급락', id: 'us2y', test: (c) => c <= -8, unit: 'bp' },
+    { key: 'spx_dn', label: 'S&P500 −1% 이하 하락', id: 'spx', test: (c) => c <= -1, unit: '%' },
+    { key: 'spx_up', label: 'S&P500 +1% 이상 상승', id: 'spx', test: (c) => c >= 1, unit: '%' },
+    { key: 'sox_dn', label: '미국 반도체지수 −2% 이하', id: 'sox', test: (c) => c <= -2, unit: '%' },
+    { key: 'vix_up', label: 'VIX +10% 이상 급등', id: 'vix', test: (c) => c >= 10, unit: '%' },
+  ];
+  function dailyChanges(pts, unit) {
+    const out = [];
+    for (let i = 1; i < (pts || []).length; i++) {
+      const [d, v] = pts[i], p = pts[i - 1][1];
+      if (v == null || p == null || !p) continue;
+      out.push([d, unit === 'bp' ? Math.round((v - p) * 100) : Math.round(((v - p) / p) * 10000) / 100]);
+    }
+    return out;
+  }
+  function transmission(items) {
+    const k = items && items.kospi && items.kospi.ok ? dailyChanges(items.kospi.pts, '%') : [];
+    const fx = items && items.usdkrw && items.usdkrw.ok ? dailyChanges(items.usdkrw.pts, '%') : [];
+    if (k.length < 20) return null;
+    const nextAfter = (arr, d) => arr.find((x) => x[0] > d);
+    const stat = (list) => {
+      const n = list.length;
+      if (!n) return { n: 0 };
+      const ks = list.map((x) => x.k);
+      return { n, down: Math.round((ks.filter((c) => c < 0).length / n) * 100), avg: Math.round((ks.reduce((a, b) => a + b, 0) / n) * 100) / 100,
+        fxUp: Math.round((list.filter((x) => x.fx != null && x.fx > 0).length / Math.max(1, list.filter((x) => x.fx != null).length)) * 100) };
+    };
+    const base = stat(k.slice(1).map(([d, c]) => ({ k: c, fx: (fx.find((x) => x[0] === d) || [])[1] })));
+    const rows = TRANSMIT.map((t) => {
+      const it = items[t.id];
+      if (!it || !it.ok) return Object.assign({}, t, { n: 0 });
+      const days = dailyChanges(it.pts, t.unit).filter(([, c]) => t.test(c));
+      const list = days.map(([d, c]) => { const nk = nextAfter(k, d); const nf = nextAfter(fx, d); return nk ? { d, c, k: nk[1], fx: nf ? nf[1] : null, kd: nk[0] } : null; }).filter(Boolean);
+      return Object.assign({}, t, stat(list), { last: list.slice(-3) });
+    });
+    return { from: k[0][0], to: k[k.length - 1][0], base, rows };
+  }
+
   // AI가 분석할 때 본 숫자 (데이터 대조를 '그때 본 숫자' 기준으로 하기 위해 저장)
   const KR_IDS = ['kospi', 'kosdaq', 'usdkrw', 'kr3y', 'kr10y'];
   function snapshot(items) {
@@ -454,5 +495,5 @@
     return out;
   }
 
-  return { curve, stockRate, alignment, decompose, vixRegime, hyRegime, dollar, korea, phase, flags, align, all, topMovers, recommendStory, FORECASTS, HORIZON, scoreOne, scoreRecords, ACTORS, scoreActors, sectorView, sectorText, verifyClaims, snapshot, koreaFreshness };
+  return { curve, stockRate, alignment, decompose, vixRegime, hyRegime, dollar, korea, phase, flags, align, all, topMovers, recommendStory, FORECASTS, HORIZON, scoreOne, scoreRecords, ACTORS, scoreActors, sectorView, sectorText, verifyClaims, snapshot, koreaFreshness, transmission };
 });

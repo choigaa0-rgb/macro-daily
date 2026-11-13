@@ -1514,6 +1514,7 @@
         <div class="rec-actions">${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener">구글 시트 열기</a>` : ''}<button class="btn primary" id="loadRecords" type="button">다시 불러오기</button></div>
       </header>
       <div id="scoreBody"><div class="card"><span class="muted">기록을 불러오는 중…</span></div></div>
+      <div id="insightBody"></div>
       <div class="card"><h2>저장된 기록 <span class="muted">눌러서 그날 결론 보기</span></h2><div id="recordsTable"><span class="muted">불러오는 중…</span></div></div>`;
   }
   async function loadRecords() {
@@ -1549,7 +1550,7 @@
       const r = map.get(a['날짜']) || { '날짜': a['날짜'], '작성 방식': 'AI 자동' };
       Object.keys(a).forEach((k) => { if (/^(AI|BULL|BEAR)전망_/.test(k) && !r[k] && a[k]) r[k] = a[k]; });
       if (!r['AI 종합 해석'] && a['AI 종합 해석']) r['AI 종합 해석'] = a['AI 종합 해석'];
-      ['교차검증_데이터', '한국 데이터 경고', '한 줄 요약', '리스크팀 판단', '신호 기준일'].forEach((k) => { if (!r[k] && a[k]) r[k] = a[k]; });
+      ['교차검증_데이터', '한국 데이터 경고', '한 줄 요약', '리스크팀 판단', '신호 기준일', '자동_국면 신호', '자동_주식 × 금리 조합', '자동_커브 패턴'].forEach((k) => { if (!r[k] && a[k]) r[k] = a[k]; });
       map.set(a['날짜'], r);
     });
     return [...map.values()].sort((x, y) => String(y['날짜']).localeCompare(String(x['날짜'])));
@@ -1590,7 +1591,72 @@
         <table class="rec score-list"><thead><tr><th>날짜</th>${S.FORECASTS.map((f) => `<th>${esc(f.label)}</th>`).join('')}</tr></thead>
         <tbody>${rows.map((r) => `<tr><td class="mono">${esc(r['날짜'])}</td>${S.FORECASTS.map((f) => { const c = r[f.key.replace('전망_', 'AI전망_')]; return `<td>${mark(one(r, f, 'AI전망_'), c)}</td>`; }).join('')}</tr>`).join('')}</tbody></table>
         <p class="muted small">기준: 기록한 날 직전 거래일 종가 → 5거래일 뒤 종가. 약 6개월보다 오래된 기록은 '기간 지남'으로 표시돼요.</p></div>`;
+    renderInsights();
     renderGuides();
+  }
+
+  // ---------- 성과·인사이트: 쌓인 기록과 시장 이력에서 자동 계산 ----------
+  function renderInsights() {
+    const box = $('#insightBody');
+    if (!box || !state.records || !state.market) return;
+    const items = state.market.items;
+    const recs = state.records;
+    const pctS = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : '–');
+
+    // 1) AI 숫자 정확도 (데이터 대조)
+    let ok = 0, bad = 0, days = 0, badDays = 0;
+    recs.forEach((r) => { const m = /일치 (\d+) · 불일치 (\d+)/.exec(r['교차검증_데이터'] || ''); if (m) { days++; ok += +m[1]; bad += +m[2]; if (+m[2]) badDays++; } });
+    const warnDays = recs.filter((r) => r['한국 데이터 경고']).length;
+
+    // 2) 판단·국면·증권사 일치도별 AI 적중률
+    const hitBy = (keyFn) => {
+      const g = {};
+      recs.forEach((r) => {
+        const k = keyFn(r);
+        if (!k) return;
+        S.FORECASTS.forEach((f) => {
+          const x = S.scoreOne(items[f.id] && items[f.id].pts, r['날짜'], r[f.key.replace('전망_', 'AI전망_')], f);
+          if (x.status !== '채점') return;
+          g[k] = g[k] || { hit: 0, total: 0 };
+          g[k].total++; if (x.hit) g[k].hit++;
+        });
+      });
+      return Object.entries(g).sort((a, b) => b[1].total - a[1].total);
+    };
+    const groups = [
+      ['리스크팀 판단', hitBy((r) => (r['리스크팀 판단'] || '').replace(/\s+/g, ' ').trim())],
+      ['국면 신호', hitBy((r) => r['자동_국면 신호'])],
+      ['증권사 리포트와', hitBy((r) => r['교차검증_리포트 일치도'] ? `${r['교차검증_리포트 일치도']}한 날` : '')],
+    ].filter(([, g]) => g.length);
+    const anyScored = groups.length > 0;
+
+    // 3) 미국 → 한국 전이 (시장 이력)
+    const T = S.transmission(items);
+    const tRows = T ? T.rows.filter((r) => r.n) : [];
+    const strong = tRows.filter((r) => r.n >= 3).map((r) => Object.assign({ gap: r.down - T.base.down }, r)).sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap))[0];
+
+    box.innerHTML = `<div class="card"><h2>성과·인사이트 <span class="muted">기록과 시장 이력에서 자동 계산</span></h2>
+      <div class="ins-grid">
+        <div class="ins"><div class="ins-l">AI 숫자 정확도</div><div class="ins-v">${ok + bad ? pctS(ok, ok + bad) : '–'}</div>
+          <div class="ins-s">${days ? `${days}일 동안 AI 문장 속 숫자 ${ok + bad}개 대조 · 틀린 날 ${badDays}일` : '대조 기록이 쌓이면 나와요'}</div></div>
+        <div class="ins"><div class="ins-l">한국 데이터 지연 감지</div><div class="ins-v">${warnDays}일</div>
+          <div class="ins-s">AI가 오래된 한국 데이터를 볼 뻔한 날 (경고를 붙여 단정하지 않게 함)</div></div>
+        ${strong ? `<div class="ins"><div class="ins-l">가장 뚜렷한 전이</div><div class="ins-v">${strong.down}%</div>
+          <div class="ins-s">${esc(strong.label)} 다음 날 KOSPI 하락 비율 (평소 ${T.base.down}%, ${strong.n}회)</div></div>` : ''}
+      </div>
+
+      ${T ? `<h3 class="ins-h">미국 장의 큰 움직임 → 다음 서울 장 <span class="muted">${esc(T.from)} ~ ${esc(T.to)} · 약 ${T.base.n}거래일</span></h3>
+      <table class="g-table ins-tbl"><thead><tr><th>미국에서 이런 날</th><th>횟수</th><th>다음 날 KOSPI 하락 비율</th><th>KOSPI 평균</th><th>원달러 상승 비율</th></tr></thead><tbody>
+        <tr class="base"><td>평소 (모든 날)</td><td>${T.base.n}</td><td>${T.base.down}%</td><td>${T.base.avg > 0 ? '+' : ''}${T.base.avg}%</td><td>${T.base.fxUp}%</td></tr>
+        ${T.rows.map((r) => `<tr><td>${esc(r.label)}</td><td>${r.n}</td>${r.n ? `<td><b class="${r.down - T.base.down >= 15 ? 'down-t' : r.down - T.base.down <= -15 ? 'up-t' : ''}">${r.down}%</b></td><td>${r.avg > 0 ? '+' : ''}${r.avg}%</td><td>${r.fxUp}%</td>` : '<td colspan="3" class="muted">해당 날 없음</td>'}</tr>`).join('')}
+      </tbody></table>
+      <p class="muted small">한국 시간으로 미국 장 다음에 열리는 서울 장과 비교했어요. 횟수가 적은 줄(5회 미만)은 참고만 하세요. 상관관계이지 인과는 아닙니다.</p>` : ''}
+
+      <h3 class="ins-h">어떤 날 AI 전망이 잘 맞았나 <span class="muted">5거래일 방향 적중률</span></h3>
+      ${anyScored ? `<div class="ins-groups">${groups.map(([name, g]) => `<div><div class="ins-gn">${esc(name)}</div><table class="g-table">${g.map(([k, t]) => `<tr><td>${esc(k)}</td><td class="mono">${pctS(t.hit, t.total)}</td><td class="muted">${t.hit}/${t.total}</td></tr>`).join('')}</table></div>`).join('')}</div>
+        <p class="muted small">채점이 쌓일수록 정확해져요. 표본이 적을 때는 방향만 참고하세요.</p>`
+      : '<p class="muted">5거래일 채점이 시작되면 리스크팀 판단·국면·증권사 일치 여부별로 나눠서 보여줘요.</p>'}
+    </div>`;
   }
   function renderWeekDaily() {
     const box = $('#weekDailyList');

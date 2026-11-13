@@ -178,3 +178,18 @@ console.log(`\n${n}개 테스트 통과`);
   assert.deepStrictEqual(h.map((x) => x.source), ['A', 'C']);
   console.log('ok - 데이터 대조 스냅샷 기준·한국 데이터 시점·시장 헤드라인 선별');
 }
+
+// 미국 → 한국 전이: 미국 장 다음에 열리는 서울 장과 비교
+{
+  const days = [];
+  for (let i = 0; i < 30; i++) days.push(new Date(Date.UTC(2026, 8, 1 + i)).toISOString().slice(0, 10));
+  // 미국 2년물: 5일마다 +10bp 급등 / KOSPI: 급등 다음 날만 하락
+  const us2y = { ok: true, pts: days.map((d, i) => [d, 4 + Math.floor(i / 5) * 0.1]) };
+  const kospi = { ok: true, pts: days.map((d, i) => [d, 5000 + i * 10 - (i % 5 === 1 ? 60 : 0)]) };
+  const T = S.transmission({ us2y, kospi, usdkrw: { ok: true, pts: days.map((d, i) => [d, 1300]) } });
+  const up = T.rows.find((r) => r.key === 'us2y_up');
+  assert.ok(up.n >= 4);
+  assert.strictEqual(up.down, 100);
+  assert.ok(T.base.down < 50);
+  console.log('ok - 미국 → 한국 전이 통계');
+}
