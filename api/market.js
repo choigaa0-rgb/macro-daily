@@ -116,7 +116,53 @@ function combine(a, b, fn, digits = 2) {
 const subtract = (a, b, digits = 2) => combine(a, b, (x, y) => x - y, digits);
 
 // ---------- Yahoo / FRED / ECOS ----------
-async function getYahoo(symbol) {
+// 한국 지수는 Yahoo 일봉에 전날 장이 늦게 붙는 날이 있어(아침 7시 수집 때 하루 이상 지연), 두 겹으로 보완:
+//  1) 같은 응답의 meta(최근 종가·시각)로 장이 끝난 마지막 날을 채움
+//  2) 그래도 늦으면 네이버 증권 일별 시세로 빠진 날을 채움
+const KR_FILL = { kospi: 'KOSPI', kosdaq: 'KOSDAQ' };
+const ymd = (ms) => new Date(ms).toISOString().slice(0, 10);
+function fillFromMeta(pts, meta) {
+  if (!meta || !meta.regularMarketTime || meta.regularMarketPrice == null) return pts;
+  const off = (meta.gmtoffset || 0) * 1000;
+  const t = meta.regularMarketTime * 1000;
+  const tradeDate = ymd(t + off);
+  const last = pts.length ? pts[pts.length - 1].date : '';
+  if (tradeDate <= last) return pts;
+  const localNow = Date.now() + off;
+  const end = meta.currentTradingPeriod && meta.currentTradingPeriod.regular && meta.currentTradingPeriod.regular.end;
+  const closed = tradeDate < ymd(localNow) || (end ? Date.now() / 1000 >= end : new Date(t + off).getUTCHours() * 60 + new Date(t + off).getUTCMinutes() >= 15 * 60 + 30);
+  if (!closed) return pts; // 장중 가격은 종가가 아니므로 붙이지 않음
+  return pts.concat([{ date: tradeDate, value: round(meta.regularMarketPrice, 4) }]);
+}
+const num = (v) => (v == null ? null : Number(String(v).replace(/,/g, '')));
+async function getNaverIndex(code) {
+  const pages = await Promise.all([1, 2].map((page) => fetchWithTimeout(`https://m.stock.naver.com/api/index/${code}/price?pageSize=60&page=${page}`, { headers: { 'User-Agent': 'Mozilla/5.0' } }, 6000)
+    .then((r) => (r.ok ? r.json() : [])).catch(() => [])));
+  const rows = [].concat(...pages.map((j) => (Array.isArray(j) ? j : (j && (j.result || j.items || j.priceInfos)) || [])));
+  return rows.map((x) => ({ date: String(x.localTradedAt || x.localDate || x.date || '').slice(0, 10), value: num(x.closePrice != null ? x.closePrice : x.close) }))
+    .filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x.date) && x.value > 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+async function fillKorea(id, pts) {
+  const before = pts.length ? pts[pts.length - 1].date : '';
+  // 서울 장은 15:30에 끝남: 오늘 15:40(KST) 이후면 오늘, 아니면 직전 평일까지 있어야 최신
+  const kst = new Date(Date.now() + 9 * 3600000);
+  let want = new Date(kst);
+  if (kst.getUTCHours() * 60 + kst.getUTCMinutes() < 15 * 60 + 40) want.setUTCDate(want.getUTCDate() - 1);
+  while ([0, 6].includes(want.getUTCDay())) want.setUTCDate(want.getUTCDate() - 1);
+  const wantDate = ymd(want.getTime());
+  if (before >= wantDate) return { pts, note: '' };
+  try {
+    const nv = await getNaverIndex(KR_FILL[id]);
+    const add = nv.filter((x) => x.date > before);
+    if (add.length) return { pts: pts.concat(add), note: `네이버 증권으로 ${add.map((x) => x.date.slice(5)).join(', ')} 보완` };
+    return { pts, note: `최신 장(${wantDate.slice(5)}) 데이터 대기 중` };
+  } catch (e) {
+    return { pts, note: `보완 실패: ${e.message}` };
+  }
+}
+
+async function getYahoo(symbol, opts = {}) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=6mo&interval=1d`;
   const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'Mozilla/5.0 (macro-dashboard)' } });
   if (!r.ok) throw new Error(`Yahoo ${r.status}`);
@@ -132,7 +178,7 @@ async function getYahoo(symbol) {
     if (close[i] == null) continue;
     pts.push({ date: new Date((ts[i] + offset) * 1000).toISOString().slice(0, 10), value: round(close[i], 4) });
   }
-  return pts;
+  return opts.meta ? fillFromMeta(pts, res.meta) : pts;
 }
 
 async function getFred(series, key) {
@@ -175,8 +221,14 @@ async function collectMarket() {
   // Yahoo
   for (const [id, sym] of Object.entries(YAHOO)) {
     tasks.push(
-      getYahoo(sym)
-        .then((pts) => { raw[id] = pts; items[id] = summarize(id, pts, 'Yahoo Finance'); })
+      getYahoo(sym, { meta: !!KR_FILL[id] })
+        .then(async (pts0) => {
+          let pts = pts0, note = '';
+          if (KR_FILL[id]) ({ pts, note } = await fillKorea(id, pts0));
+          raw[id] = pts;
+          items[id] = summarize(id, pts, note && note.startsWith('네이버') ? 'Yahoo Finance + 네이버 증권' : 'Yahoo Finance');
+          if (note) items[id].note = note;
+        })
         .catch((e) => { items[id] = { ok: false, source: 'Yahoo Finance', error: e.message }; errors.push(`${id}: ${e.message}`); })
     );
   }
@@ -267,3 +319,4 @@ module.exports = async (req, res) => {
   sendJson(res, 200, data);
 };
 module.exports.collectMarket = collectMarket;
+module.exports.fillFromMeta = fillFromMeta;

@@ -1709,8 +1709,10 @@
     const pctS = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : '–');
 
     // 1) AI 숫자 정확도 (데이터 대조)
+    // 데이터 대조 방식을 고친 날(AI가 본 데이터 기준 대조·기준선 표현 처리) 이후 기록만 셈
+    const ACC_FROM = '2026-11-13';
     let ok = 0, bad = 0, days = 0, badDays = 0;
-    recs.forEach((r) => { const m = /일치 (\d+) · 불일치 (\d+)/.exec(r['교차검증_데이터'] || ''); if (m) { days++; ok += +m[1]; bad += +m[2]; if (+m[2]) badDays++; } });
+    recs.filter((r) => String(r['날짜']) >= ACC_FROM).forEach((r) => { const m = /일치 (\d+) · 불일치 (\d+)/.exec(r['교차검증_데이터'] || ''); if (m) { days++; ok += +m[1]; bad += +m[2]; if (+m[2]) badDays++; } });
     const warnDays = recs.filter((r) => r['한국 데이터 경고']).length;
     const closeRs = recs.map((r) => r['장 마감 복기 결과']).filter(Boolean);
     const closeHit = closeRs.filter((x) => x === '맞음').length, closePart = closeRs.filter((x) => x === '부분').length;
@@ -1745,7 +1747,7 @@
     box.innerHTML = `<div class="card"><h2>성과·인사이트 <span class="muted">기록과 시장 이력에서 자동 계산</span></h2>
       <div class="ins-grid">
         <div class="ins"><div class="ins-l">AI 숫자 정확도</div><div class="ins-v">${ok + bad ? pctS(ok, ok + bad) : '–'}</div>
-          <div class="ins-s">${days ? `${days}일 동안 AI 문장 속 숫자 ${ok + bad}개 대조 · 틀린 날 ${badDays}일` : '대조 기록이 쌓이면 나와요'}</div></div>
+          <div class="ins-s">${days ? `${days}일 동안 AI 문장 속 숫자 ${ok + bad}개 대조 · 틀린 날 ${badDays}일` : '대조 기록이 쌓이면 나와요'} <span class="muted">(${ACC_FROM.slice(5).replace('-', '/')} 이후, 대조 방식 개선 뒤)</span></div></div>
         <div class="ins"><div class="ins-l">AI 한국장 당일 판단</div><div class="ins-v">${closeRs.length ? pctS(closeHit + closePart * 0.5, closeRs.length) : '–'}</div>
           <div class="ins-s">${closeRs.length ? `장 마감 복기 ${closeRs.length}일 · 맞음 ${closeHit} · 부분 ${closePart} · 틀림 ${closeRs.length - closeHit - closePart} (부분은 절반으로 계산)` : '장 마감 복기를 하면 쌓여요'}</div></div>
         <div class="ins"><div class="ins-l">한국 데이터 지연 감지</div><div class="ins-v">${warnDays}일</div>
