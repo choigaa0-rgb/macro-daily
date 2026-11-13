@@ -865,7 +865,7 @@
 
 
   // ---------- 주요 일정 + 영향 지도 (calendar.js) ----------
-  function calendarCard() {
+  function calendarCard(span) {
     const K = window.Calendar;
     if (!K) return '';
     const now = Date.now();
@@ -878,9 +878,9 @@
     const dd = (e) => (e.past ? '<span class="badge neutral">발표됨</span>' : e.dday === 0 ? '<span class="badge bad">오늘</span>' : e.dday === 1 ? '<span class="badge warn">내일</span>' : `<span class="badge info">D-${e.dday}</span>`);
     const rows = list.map((e) => `<details class="cal-row${e.past ? ' past' : ''}"><summary>${dd(e)}<span class="cal-when">${esc(e.kstDate.slice(5).replace('-', '/'))}(${esc(e.dow)}) ${esc(e.kstTime)}</span><span class="cal-name">${esc(e.name)}</span><span class="ind-tag">${esc(e.country)}</span>${e.past ? '<a href="#" class="cal-go" data-act="goto-event">이벤트일 점검 →</a>' : ''}</summary>
         <table class="g-table cal-imp"><tr><th>볼 것</th><td>${esc(e.impact.watch)}</td></tr><tr><th class="up">예상보다 높게·매파적</th><td>${esc(e.impact.hot)}</td></tr><tr><th class="down">예상보다 낮게·비둘기파적</th><td>${esc(e.impact.cool)}</td></tr></table></details>`).join('');
-    return `<section class="card span-12"><div class="wk-head"><h2>주요 일정 <span class="muted">한국시간 · 2주</span></h2><a href="https://kr.investing.com/economic-calendar/" target="_blank" rel="noopener">전체 경제 캘린더 ↗</a></div>
+    return `<section class="card cal-card ${span || 'span-12'}"><div class="wk-head"><h2>주요 일정 <span class="muted">한국시간</span></h2><a href="https://kr.investing.com/economic-calendar/" target="_blank" rel="noopener">전체 캘린더 ↗</a></div>
       ${rows || '<p class="muted">2주 안에 등록된 일정이 없습니다.</p>'}
-      <p class="muted small">공식 발표 일정(연준·BLS·BEA·한국은행) 기준. 줄을 누르면 결과별 1차 반응을 볼 수 있어요. 실제 반응은 그날 시장의 관심사에 따라 달라집니다.${K.lastDate() < new Date(now + 60 * 86400000).toISOString().slice(0, 10) ? ' ⚠ 등록된 일정이 곧 끝나요. calendar.js에 다음 해 일정을 추가해 주세요.' : ''}</p></section>`;
+      <p class="muted small cal-note">연준·BLS·BEA·한국은행 공식 일정. 줄을 누르면 결과별 1차 반응이 보여요.${K.lastDate() < new Date(now + 60 * 86400000).toISOString().slice(0, 10) ? ' ⚠ 등록된 일정이 곧 끝나요. calendar.js에 다음 해 일정을 추가해 주세요.' : ''}</p></section>`;
   }
 
   // ---------- 오늘의 브리핑 (읽기 중심 + 교차검증) ----------
@@ -1015,7 +1015,7 @@
     const sigRows = ['curve', 'stockRate', 'alignment', 'dollar', 'korea', 'phase'].map((k) => sig[k] ? `<li><span class="sg-l">${esc(SIGNAL_TITLES[k])}</span><span class="sg-v ${sig[k].tone}">${esc(sig[k].name)}</span></li>` : '').join('');
     const sv = sig.sectors;
     const meta = `${src ? `${esc(src.source)}${src.at ? ` · ${esc(src.at)}` : ''}${src.model ? ` · ${esc(src.model)}` : ''}` : '아직 오늘 브리핑이 없습니다'}${sig.signalDate ? ` · 미국 ${esc(sig.signalDate)} 종가 기준` : ''}`;
-    body.innerHTML = `${introCard()}
+    body.innerHTML = `
       <header class="page-head">
         <div>
           <div class="ph-kicker">아침 브리핑</div>
@@ -1027,6 +1027,7 @@
           <button class="btn primary" id="briefMake" type="button" ${busy ? 'disabled' : ''}>${busy ? `${esc(stageName)} 진행 중…` : b ? '다시 만들기' : '지금 브리핑 만들기'}</button>
         </div>
       </header>
+      ${introCard()}
       ${run.error ? `<div class="err">${esc(run.error)} <button class="btn mini" data-act="debate-resume" type="button">이 단계부터 다시</button></div>` : ''}
       ${keyStrip()}
 
@@ -1048,8 +1049,6 @@
           ${sigRows ? `<ul class="sig-list">${sigRows}</ul>` : '<p class="muted">데이터를 불러오면 나옵니다.</p>'}
         </section>
 
-        ${calendarCard()}
-
         ${b ? `<section class="card span-7">
           <h2>결론 세부</h2>
           <table class="g-table concl-tbl">${CONCL_ROWS.filter((k) => b[k]).map((k) => `<tr><th>${esc(k)}</th><td>${esc(b[k])}</td></tr>`).join('')}</table>
@@ -1067,14 +1066,22 @@
           <ul class="mini-list">${state.industry.issues.slice(0, 4).map((it) => `<li><span class="ind-tag">${esc(it.industry || it.sector || '')}</span><span class="ml-t">${esc(it.title)}</span><span class="badge ${IMPACT_TONE[it.impact] || 'neutral'}">${esc(it.impact || '')}</span></li>`).join('')}</ul></section>` : ''}
         ${state.company ? `<section class="card co-mini ${state.industry ? 'span-6' : 'span-12'}"><div class="wk-head"><h2>오늘의 기업</h2><a href="#" data-act="goto-company">카드 보기</a></div>
           <div class="co-mini-name">${esc(state.company.data.company.name)}</div>
-          <p>${esc((state.company.card || {}).one_liner || '')}</p><p class="muted small">${esc(state.company.reason || '')}</p></section>` : ''}
+          <p>${esc((state.company.card || {}).one_liner || '')}</p>
+          ${(() => {
+            const want = [/^PER/, /^PBR/, /^시가총액/, /1개월 수익률/, /52주 고점 대비/, /연초 대비/];
+            const ms = (state.company.data.metrics || []);
+            const pick = want.map((re) => ms.find((m) => re.test(m.label))).filter(Boolean).slice(0, 4);
+            return pick.length ? `<div class="co-mini-m">${pick.map((m) => `<div><span>${esc(m.label.replace(/\(.*?\)|간이,?|최근 연간 순이익/g, '').trim())}</span><b class="mono">${esc(m.value)}</b></div>`).join('')}</div>` : '';
+          })()}
+          <p class="muted small">${esc(state.company.reason || '')}</p></section>` : ''}
 
-        ${sv && (sv.fav.length || sv.unfav.length) ? `<section class="card span-12"><h2>섹터 시사점 <span class="muted">규칙 기반</span></h2>
+        ${sv && (sv.fav.length || sv.unfav.length) ? `<section class="card span-7"><h2>섹터 시사점 <span class="muted">규칙 기반</span></h2>
           <div class="sector2">
             <div><div class="sec-h bull">유리</div>${sv.fav.length ? `<ul>${sv.fav.map((x) => `<li><b>${esc(x.sector)}</b> <span class="muted">${esc(x.why.join(', '))}</span></li>`).join('')}</ul>` : '<p class="muted">없음</p>'}</div>
             <div><div class="sec-h bear">불리</div>${sv.unfav.length ? `<ul>${sv.unfav.map((x) => `<li><b>${esc(x.sector)}</b> <span class="muted">${esc(x.why.join(', '))}</span></li>`).join('')}</ul>` : '<p class="muted">없음</p>'}</div>
           </div>
         </section>` : ''}
+        ${calendarCard(sv && (sv.fav.length || sv.unfav.length) ? 'span-5' : 'span-12')}
       </div>`;
     renderCross();
   }
@@ -1664,8 +1671,8 @@
           <div class="ins-s">${days ? `${days}일 동안 AI 문장 속 숫자 ${ok + bad}개 대조 · 틀린 날 ${badDays}일` : '대조 기록이 쌓이면 나와요'}</div></div>
         <div class="ins"><div class="ins-l">한국 데이터 지연 감지</div><div class="ins-v">${warnDays}일</div>
           <div class="ins-s">AI가 오래된 한국 데이터를 볼 뻔한 날 (경고를 붙여 단정하지 않게 함)</div></div>
-        ${strong ? `<div class="ins"><div class="ins-l">가장 뚜렷한 전이</div><div class="ins-v">${strong.down}%</div>
-          <div class="ins-s">${esc(strong.label)} 다음 날 KOSPI 하락 비율 (평소 ${T.base.down}%, ${strong.n}회)</div></div>` : ''}
+        ${strong ? `<div class="ins"><div class="ins-l">가장 뚜렷한 미국 → 한국 전이</div><div class="ins-v">${T.base.down}% <small>→</small> ${strong.down}%</div>
+          <div class="ins-s">다음 날 KOSPI 하락 비율 (평소 → ${esc(strong.label)} 다음 날, ${strong.n}회)</div></div>` : ''}
       </div>
 
       ${T ? `<h3 class="ins-h">미국 장의 큰 움직임 → 다음 서울 장 <span class="muted">${esc(T.from)} ~ ${esc(T.to)} · 약 ${T.base.n}거래일</span></h3>
