@@ -1,11 +1,13 @@
 // 아침 자동 브리핑
 // 평일 아침 Vercel 크론이 호출 → 데이터 수집 → 자동 신호 → AI 리서치센터 토론(한 번에) → 시트 '자동 브리핑' 저장 → 메일 발송
 // 수동 실행(테스트): /api/morning?pass=앱비밀번호   (메일 없이: &nomail=1)
+// 재시도(retry=1): Vercel 크론이 7시대·8시대에 한 번씩 부름. 오늘 AI 브리핑이 이미 있으면 아무것도 안 하고,
+//   7시 브리핑이 Gemini 혼잡 등으로 실패했으면 한국장 개장 전(08:55)까지만 다시 만든다 (개장 뒤 만들면 적중률이 공정하지 않음).
 //
 // 필요한 환경변수: CRON_SECRET(크론 인증), MORNING_MAIL_TO(받는 주소), SHEET_WEBHOOK_URL, SHEET_SECRET, GEMINI_API_KEY
 // 선택: DASHBOARD_URL(메일 속 링크. 없으면 요청 주소로 만듦)
 
-const { sendJson, fetchWithTimeout, callGemini } = require('./_lib');
+const { sendJson, fetchWithTimeout, callGemini, sheetRows } = require('./_lib');
 const { collectMarket } = require('./market');
 const { fetchNews, marketHeadlines, headlinesText } = require('./_data');
 const S = require('../signals.js');
@@ -146,6 +148,17 @@ module.exports = async (req, res) => {
 
   const date = url.searchParams.get('date') || kstDate();
   const steps = [];
+  const retry = url.searchParams.get('retry') === '1';
+  let today = null; // 시트의 오늘 '자동 브리핑' 줄 (재시도 판단·성공본 보호용)
+  if (retry) {
+    const gate = retryGate(new Date());
+    if (gate) return sendJson(res, 200, { ok: true, date, skipped: gate });
+  }
+  if (!url.searchParams.get('date')) {
+    today = (await sheetRows('자동 브리핑', 3)).find((r) => String(r['날짜'] || '').slice(0, 10) === date) || null;
+    if (retry && today && today['AI 결론 JSON']) return sendJson(res, 200, { ok: true, date, skipped: '오늘 AI 브리핑이 이미 있음' });
+    if (retry && !today && kstMinutes(new Date()) < 7 * 60 + 30) return sendJson(res, 200, { ok: true, date, skipped: '7시 자동 실행 전' });
+  }
   try {
     const mock = url.searchParams.get('mock') === '1';
     const [market, news] = await Promise.all([
@@ -199,8 +212,13 @@ module.exports = async (req, res) => {
       record[`BEAR전망_${k}`] = D && D.bear && D.bear.forecast ? D.bear.forecast[k] || '' : '';
     });
     ['curve', 'stockRate', 'alignment', 'dollar', 'korea', 'phase'].forEach((k) => { record[`자동_${TITLES[k]}`] = sig[k] ? sig[k].name : ''; });
+    if (!D && today && today['AI 결론 JSON']) {
+      // 이미 성공한 오늘 브리핑을 실패본으로 덮어쓰지 않음 (재시도가 먼저 성공한 경우 등)
+      steps.push('AI 실패 — 오늘 저장된 브리핑을 유지');
+      return sendJson(res, 200, { ok: true, date, steps, kept: true, seconds: Math.round((Date.now() - started) / 1000) });
+    }
     await postSheet({ sheet: '자동 브리핑', record });
-    steps.push('시트 저장');
+    steps.push(retry ? (D ? '시트 저장 (재시도 성공)' : '시트 저장 (재시도도 실패)') : '시트 저장');
 
     const host0 = req.headers['x-forwarded-host'] || req.headers.host || '';
     const link0 = process.env.DASHBOARD_URL || (host0 ? `https://${host0}/` : '');
@@ -211,10 +229,10 @@ module.exports = async (req, res) => {
         mailHtml: mailHtml({ date, sig, groups, D, chief, aiError, link: link0 }) });
     }
     const to = process.env.MORNING_MAIL_TO;
-    if (to && url.searchParams.get('nomail') !== '1') {
+    if (to && url.searchParams.get('nomail') !== '1' && (!retry || D)) {
       const host = req.headers['x-forwarded-host'] || req.headers.host || '';
       const link = process.env.DASHBOARD_URL || (host ? `https://${host}/` : '');
-      const subject = `[Macro Daily] ${date.slice(5).replace('-', '/')} 아침 브리핑${D && D.risk ? ` — ${D.risk.balance}` : ''}${D && D.headline ? ` · ${D.headline}` : ''}`.slice(0, 120);
+      const subject = `[Macro Daily] ${date.slice(5).replace('-', '/')} 아침 브리핑${retry ? ' (재시도)' : ''}${D && D.risk ? ` — ${D.risk.balance}` : ''}${D && D.headline ? ` · ${D.headline}` : ''}`.slice(0, 120);
       await postSheet({ action: 'mail', to, subject, html: mailHtml({ date, sig, groups, D, chief, aiError, link }) });
       steps.push(`메일 발송 → ${to}`);
     }
@@ -223,5 +241,15 @@ module.exports = async (req, res) => {
     return sendJson(res, 500, { ok: false, date, steps, error: e.message });
   }
 };
+// 한국시간 하루 중 분
+function kstMinutes(now) { const k = new Date(now.getTime() + 9 * 3600000); return k.getUTCHours() * 60 + k.getUTCMinutes(); }
+// 재시도를 건너뛸 이유 (없으면 '')
+function retryGate(now) {
+  const day = new Date(now.getTime() + 9 * 3600000).getUTCDay();
+  if (day === 0 || day === 6) return '주말';
+  if (kstMinutes(now) >= 8 * 60 + 55) return '한국장 개장 직전 이후라 만들지 않음 (적중률 공정성)';
+  return '';
+}
 module.exports.mailHtml = mailHtml;
+module.exports.retryGate = retryGate;
 module.exports.buildTexts = buildTexts;
