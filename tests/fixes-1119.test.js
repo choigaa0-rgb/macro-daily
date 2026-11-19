@@ -30,6 +30,9 @@ const { pickShares } = require('../api/_data.js');
   const multi = { units: { shares: [{ end: '2026-10-31', val: 1.7e9 }, { end: '2026-10-31', val: 8e6 }] } };
   assert.deepStrictEqual(pickShares(multi, { units: { shares: [{ frame: 'CY2025', val: 1.99e9 }] } }), { shares: 1.99e9, sharesNote: '희석 가중평균 주식수' });
   assert.strictEqual(pickShares(multi, null).shares, null);
-  assert.strictEqual(pickShares({ units: { shares: [{ end: '2026-01-01', val: 5e9 }] } }, null).shares, 5e9);
-  console.log('ok - 주식 종류가 여러 개면 희석 주식수로 시가총액 계산');
+  assert.strictEqual(pickShares({ units: { shares: [{ end: '2026-01-01', val: 5e9 }] } }, null, new Date('2026-11-19')).shares, 5e9);
+  // 비자 실제 사례: 표지 주식수가 2010년 값만 남아 있음
+  const stale = { units: { shares: [{ end: '2009-11-13', val: 470210301 }, { end: '2010-01-27', val: 469280842 }] } };
+  assert.strictEqual(pickShares(stale, { units: { shares: [{ frame: 'CY2025', val: 1.97e9 }] } }, new Date('2026-11-19')).shares, 1.97e9);
+  console.log('ok - 주식 종류가 여러 개거나 표지 값이 오래되면 희석 주식수로 시가총액 계산');
 })().catch((e) => { console.error(e); process.exit(1); });

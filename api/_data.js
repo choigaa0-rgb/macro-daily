@@ -384,14 +384,16 @@ async function secFinancials(cik) {
 }
 // 주식 수: 표지(dei)의 발행주식수를 쓰되, 주식 종류가 여러 개인 회사(예: 비자 A·B·C주)는
 // 한 종류만 잡혀 시가총액이 크게 작아지므로 '희석 가중평균 주식수(연간)'로 대신한다. 둘 다 없으면 시가총액을 계산하지 않는다.
-function pickShares(sh, dil) {
+// 비자처럼 종류별 주식수는 표지 값이 아예 안 잡히고 아주 오래된 값(예: 2010년)만 남는 경우도 있어, 18개월보다 오래된 값은 쓰지 않는다.
+function pickShares(sh, dil, now = new Date()) {
   let shares = null, sharesNote = '';
   const list = sh && sh.units && sh.units.shares ? sh.units.shares.slice().sort((a, b) => a.end.localeCompare(b.end)) : [];
   if (list.length) {
     const lastEnd = list[list.length - 1].end;
     const same = list.filter((x) => x.end === lastEnd);
     const vals = new Set(same.map((x) => x.val));
-    if (vals.size <= 1) shares = list[list.length - 1].val;
+    const fresh = now - new Date(lastEnd) < 548 * 86400000;
+    if (vals.size <= 1 && fresh) shares = list[list.length - 1].val;
   }
   if (shares == null) {
     const d = annualPair(dil);
