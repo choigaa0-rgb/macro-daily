@@ -7,7 +7,7 @@
 // 필요한 환경변수: CRON_SECRET(크론 인증), MORNING_MAIL_TO(받는 주소), SHEET_WEBHOOK_URL, SHEET_SECRET, GEMINI_API_KEY
 // 선택: DASHBOARD_URL(메일 속 링크. 없으면 요청 주소로 만듦)
 
-const { sendJson, fetchWithTimeout, callGemini, sheetRows } = require('./_lib');
+const { sendJson, fetchWithTimeout, callGemini, sheetRows, cleanChoice, cleanChief } = require('./_lib');
 const { collectMarket } = require('./market');
 const { fetchNews, marketHeadlines, headlinesText } = require('./_data');
 const S = require('../signals.js');
@@ -31,10 +31,10 @@ TradingAgents 구조: 애널리스트 보고서(주어짐) → BULL(낙관)·BEA
   "bull": { "claim": "핵심 주장", "points": ["근거", "근거", "근거"], "korea": "한국 견해", "forecast": { "미국10년물": "", "S&P500": "", "원달러": "", "KOSPI": "" } },
   "bear": { "claim": "", "points": ["", "", ""], "korea": "", "forecast": { "미국10년물": "", "S&P500": "", "원달러": "", "KOSPI": "" } },
   "rebut": { "bull": { "rebuttal": "BEAR 반박 한 문장", "concede": "인정하는 점" }, "bear": { "rebuttal": "BULL 반박 한 문장", "concede": "인정하는 점" } },
-  "risk": { "balance": "BULL 우세 | BEAR 우세 | 팽팽", "reason": "", "key_issue": "", "bull_wrong_if": "", "bear_wrong_if": "", "scenarios": [ { "name": "", "trigger": "", "reaction": "" } ], "checkpoints": ["", ""] },
-  "chief": { "오늘의 동인": "[무엇이] [얼마나] — [왜]", "이야기": "성장 | 물가 | 정책 | 위험 회피·지정학 | 실적·개별 이슈 | 뚜렷한 동인 없음",
-    "한국 영향": "", "국면 판단": "골디락스 쪽 | 리플레이션 쪽 | 침체·디스인플레이션 쪽 | 스태그플레이션 우려 쪽 | 판단 보류",
-    "뷰 변화": "유지 | 강화 | 약화 | 수정", "다음 체크포인트": "", "투자 시사점": "유리·불리 섹터와 이유 (종목 추천 금지)",
+  "risk": { "balance": "BULL 우세 | BEAR 우세 | 팽팽 중 하나만", "reason": "", "key_issue": "", "bull_wrong_if": "", "bear_wrong_if": "", "scenarios": [ { "name": "", "trigger": "", "reaction": "" } ], "checkpoints": ["", ""] },
+  "chief": { "오늘의 동인": "[무엇이] [얼마나] — [왜]", "이야기": "성장 | 물가 | 정책 | 위험 회피·지정학 | 실적·개별 이슈 | 뚜렷한 동인 없음 중 하나만",
+    "한국 영향": "", "국면 판단": "골디락스 쪽 | 리플레이션 쪽 | 침체·디스인플레이션 쪽 | 스태그플레이션 우려 쪽 | 판단 보류 중 하나만",
+    "뷰 변화": "유지 | 강화 | 약화 | 수정 중 하나만", "다음 체크포인트": "", "투자 시사점": "유리·불리 섹터와 이유 (종목 추천 금지)",
     "종합 해석": "3~5문장. BULL과 BEAR 중 무엇을 받아들이고 무엇을 남겨두는지 포함",
     "전망": { "미국10년물": "", "S&P500": "", "원달러": "", "KOSPI": "" } } }`;
 
@@ -176,7 +176,7 @@ module.exports = async (req, res) => {
     const budget = 50000 - (Date.now() - started);
     if (budget > 10000) {
       const r = await callGemini({ system: PROMPT, parts: [{ text: `날짜: ${date}\n\n${analyst}` }], temperature: 0.5, json: true, maxOutputTokens: 3500, budgetMs: budget, primaryMs: Math.min(28000, budget - 12000) });
-      if (r.ok) { D = parseJson(r.text); model = r.model; if (!D) aiError = 'AI 응답 형식 오류'; } else aiError = r.error;
+      if (r.ok) { D = parseJson(r.text); model = r.model; if (!D) aiError = 'AI 응답 형식 오류'; else { cleanChief(D.chief); if (D.risk) D.risk.balance = cleanChoice('balance', D.risk.balance); } } else aiError = r.error;
     } else aiError = '데이터 수집이 오래 걸려 AI 토론을 건너뜀';
     steps.push(D ? `AI 토론 (${model})` : `AI 토론 실패: ${aiError}`);
 

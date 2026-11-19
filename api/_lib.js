@@ -220,4 +220,41 @@ function parseJsonLoose(text) {
 }
 const kstDate = () => new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
 
-module.exports = { NEED_PASS, DEMO_NO_SAVE, demoGate, role, sendJson, checkPasscode, fetchWithTimeout, readBody, callGemini, listModels, pickLight, sheetPost, sheetRows, isAuthorized, parseJsonLoose, kstDate };
+// AI가 선택지 목록("A | B | C")을 그대로 베껴 쓰는 경우를 막음: 선택지 중 하나면 그대로, 아니면 대체값
+const CHOICES = {
+  '이야기': ['성장', '물가', '정책', '위험 회피·지정학', '실적·개별 이슈', '뚜렷한 동인 없음'],
+  '국면 판단': ['골디락스 쪽', '리플레이션 쪽', '침체·디스인플레이션 쪽', '스태그플레이션 우려 쪽', '판단 보류'],
+  '뷰 변화': ['유지', '강화', '약화', '수정'],
+  balance: ['BULL 우세', 'BEAR 우세', '팽팽'],
+};
+const FALLBACK = { '이야기': '', '국면 판단': '판단 보류', '뷰 변화': '유지', balance: '' };
+function cleanChoice(key, v) {
+  const opts = CHOICES[key];
+  if (!opts || typeof v !== 'string') return v;
+  const t = v.trim();
+  if (opts.includes(t)) return t;
+  if (t.includes('|')) return FALLBACK[key];
+  const hit = opts.filter((o) => t.includes(o));
+  return hit.length === 1 ? hit[0] : t; // 문장으로 답했으면 원문 유지
+}
+function cleanChief(chief) {
+  if (!chief || typeof chief !== 'object') return chief;
+  ['이야기', '국면 판단', '뷰 변화'].forEach((k) => { if (k in chief) chief[k] = cleanChoice(k, chief[k]); });
+  return chief;
+}
+
+// 아침 자동 실행 재시도 판단 (Vercel 크론이 ?retry=1로 부름). 건너뛸 이유를 돌려주고, 만들어야 하면 ''.
+const kstMinutes = (now = new Date()) => { const k = new Date(now.getTime() + 9 * 3600000); return k.getUTCHours() * 60 + k.getUTCMinutes(); };
+async function retrySkip({ sheet, field, cutoffMin, now = new Date() }) {
+  const day = new Date(now.getTime() + 9 * 3600000).getUTCDay();
+  if (day === 0 || day === 6) return '주말';
+  const m = kstMinutes(now);
+  if (m >= cutoffMin) return '재시도 시간 지남';
+  const today = new Date(now.getTime() + 9 * 3600000).toISOString().slice(0, 10);
+  const row = (await sheetRows(sheet, 3)).find((r) => String(r['날짜'] || '').slice(0, 10) === today);
+  if (row && row[field]) return '오늘 것이 이미 있음';
+  if (!row && m < 7 * 60 + 30) return '7시 자동 실행 전';
+  return '';
+}
+
+module.exports = { NEED_PASS, DEMO_NO_SAVE, demoGate, role, sendJson, checkPasscode, fetchWithTimeout, readBody, callGemini, listModels, pickLight, sheetPost, sheetRows, isAuthorized, parseJsonLoose, kstDate, cleanChoice, cleanChief, retrySkip, kstMinutes };

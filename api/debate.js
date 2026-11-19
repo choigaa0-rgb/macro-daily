@@ -4,7 +4,7 @@
 //
 // POST /api/debate { stage: 'open' | 'rebut' | 'risk' | 'chief', date, analystText, dataText, manualText, previousText, debate }
 
-const { sendJson, checkPasscode, demoGate, readBody, callGemini } = require('./_lib');
+const { sendJson, checkPasscode, demoGate, readBody, callGemini, cleanChoice, cleanChief } = require('./_lib');
 const { fetchNews, marketHeadlines, headlinesText } = require('./_data');
 
 const COMMON = `너는 한국 증권사 리서치센터의 데일리 매크로 토론을 진행한다.
@@ -131,6 +131,8 @@ ${debateText(body.debate)}${heads ? `\n\n[시장 헤드라인 (언론사 RSS 제
   if (!r.ok) return sendJson(res, r.status, { ok: false, error: r.error });
   const data = parseJson(r.text);
   if (!data) return sendJson(res, 502, { ok: false, error: 'AI 응답 형식을 읽지 못했습니다. 다시 눌러주세요.' });
+  if (stage === 'chief') cleanChief(data);
+  if (stage === 'risk' && data.balance) data.balance = cleanChoice('balance', data.balance);
   return sendJson(res, 200, { ok: true, model: r.model, stage, data });
 };
 

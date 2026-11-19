@@ -33,6 +33,22 @@
     {
       "path": "/api/morning?retry=1",
       "schedule": "20 23 * * 0-4"
+    },
+    {
+      "path": "/api/industry?retry=1",
+      "schedule": "50 22 * * 0-4"
+    },
+    {
+      "path": "/api/industry?retry=1",
+      "schedule": "30 23 * * 0-4"
+    },
+    {
+      "path": "/api/company?retry=1",
+      "schedule": "55 22 * * 0-4"
+    },
+    {
+      "path": "/api/company?retry=1",
+      "schedule": "40 23 * * 0-4"
     }
   ]
 }

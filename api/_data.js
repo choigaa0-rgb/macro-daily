@@ -367,20 +367,38 @@ function annualPair(concept) {
   return { year: Number(last.frame.slice(2)), val: last.val, prev: prev ? prev.val : null };
 }
 async function secFinancials(cik) {
-  const [rev1, rev2, op, ni, eq, sh] = await Promise.all([
+  const [rev1, rev2, op, ni, eq, sh, dil] = await Promise.all([
     secConcept(cik, 'RevenueFromContractWithCustomerExcludingAssessedTax'), secConcept(cik, 'Revenues'),
     secConcept(cik, 'OperatingIncomeLoss'), secConcept(cik, 'NetIncomeLoss'), secConcept(cik, 'StockholdersEquity'),
     secConcept(cik, 'EntityCommonStockSharesOutstanding', 'dei'),
+    secConcept(cik, 'WeightedAverageNumberOfDilutedSharesOutstanding').catch(() => null),
   ]);
   const ra = annualPair(rev1), rb = annualPair(rev2);
   const rev = ra && rb ? (ra.year >= rb.year ? ra : rb) : ra || rb;
   const o = annualPair(op), n = annualPair(ni);
   let equity = null;
   if (eq && eq.units && eq.units.USD) { const e = eq.units.USD.filter((x) => x.form === '10-K' || x.form === '10-Q').sort((a, b) => a.end.localeCompare(b.end)); equity = e.length ? e[e.length - 1].val : null; }
-  let shares = null;
-  if (sh && sh.units && sh.units.shares) { const s = sh.units.shares.slice().sort((a, b) => a.end.localeCompare(b.end)); shares = s.length ? s[s.length - 1].val : null; }
+  const { shares, sharesNote } = pickShares(sh, dil);
   if (!rev && !o && !n) return null;
-  return { annual: { year: (rev || o || n).year, rev: rev && rev.val, revPrev: rev && rev.prev, op: o && o.val, opPrev: o && o.prev, ni: n && n.val, niPrev: n && n.prev, equity }, shares };
+  return { annual: { year: (rev || o || n).year, rev: rev && rev.val, revPrev: rev && rev.prev, op: o && o.val, opPrev: o && o.prev, ni: n && n.val, niPrev: n && n.prev, equity }, shares, sharesNote };
+}
+// 주식 수: 표지(dei)의 발행주식수를 쓰되, 주식 종류가 여러 개인 회사(예: 비자 A·B·C주)는
+// 한 종류만 잡혀 시가총액이 크게 작아지므로 '희석 가중평균 주식수(연간)'로 대신한다. 둘 다 없으면 시가총액을 계산하지 않는다.
+function pickShares(sh, dil) {
+  let shares = null, sharesNote = '';
+  const list = sh && sh.units && sh.units.shares ? sh.units.shares.slice().sort((a, b) => a.end.localeCompare(b.end)) : [];
+  if (list.length) {
+    const lastEnd = list[list.length - 1].end;
+    const same = list.filter((x) => x.end === lastEnd);
+    const vals = new Set(same.map((x) => x.val));
+    if (vals.size <= 1) shares = list[list.length - 1].val;
+  }
+  if (shares == null) {
+    const d = annualPair(dil);
+    if (d && d.val > 0) { shares = d.val; sharesNote = '희석 가중평균 주식수'; }
+    else if (list.length) sharesNote = '주식 종류가 여러 개라 시가총액 생략';
+  }
+  return { shares, sharesNote };
 }
 // SEC 공시 종류를 한국어로 (8-K는 항목 번호로 무슨 일인지)
 const SEC_FORM = { '10-Q': '분기보고서', '10-K': '연간보고서', '8-K': '수시공시', '6-K': '해외기업 수시공시', '20-F': '해외기업 연간보고서', 'DEF 14A': '주총 안건', 'S-1': '상장 신고서' };
@@ -408,4 +426,5 @@ async function secFilings(cik) {
   return out;
 }
 
-module.exports = { UNIVERSE, FEEDS, parseRss, fetchNews, marketHeadlines, headlinesText, newsFor, yahooChart, rankAttention, priceStats, unzipFirst, dartCorpCode, dartFinancials, dartShares, dartDisclosures, dartCompany, brokerReports, parseNaverResearch, reportSummary, secCik, secFinancials, secFilings, annualPair, pickAccounts };
+module.exports = {
+  pickShares, UNIVERSE, FEEDS, parseRss, fetchNews, marketHeadlines, headlinesText, newsFor, yahooChart, rankAttention, priceStats, unzipFirst, dartCorpCode, dartFinancials, dartShares, dartDisclosures, dartCompany, brokerReports, parseNaverResearch, reportSummary, secCik, secFinancials, secFilings, annualPair, pickAccounts };

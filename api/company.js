@@ -7,7 +7,7 @@
 // 교차검증: AI 문장에 나온 숫자가 제공한 데이터에 있는지 자동 대조, 관련 뉴스·공시 링크로 사실 확인 가능하게 함.
 // 투자 권유가 아닌 분석 카드: BULL·BEAR 논거와 체크포인트를 나란히 보여줌.
 
-const { NEED_PASS, sendJson, isAuthorized, demoGate, readBody, callGemini, sheetPost, sheetRows, parseJsonLoose, kstDate } = require('./_lib');
+const { NEED_PASS, sendJson, isAuthorized, demoGate, readBody, callGemini, sheetPost, sheetRows, parseJsonLoose, kstDate, retrySkip } = require('./_lib');
 const D = require('./_data');
 
 const PROMPT = `너는 한국 증권사 리서치센터의 기업 애널리스트다. 주어진 데이터로 기업 1곳의 '스톡피치 형식 분석 카드'를 만든다.
@@ -61,7 +61,7 @@ async function gather(company, news) {
   out.price = chart ? D.priceStats(chart.rows) : null;
   out.currency = chart ? chart.currency : null;
   out.news = D.newsFor(company, news).slice(0, 6).map((n) => ({ source: n.source, title: n.title, link: n.link }));
-  let fin = null, shares = null, filings = [];
+  let fin = null, shares = null, sharesNote = '', filings = [];
   if (company.market === 'KR') {
     try {
       const corp = await D.dartCorpCode(company.ticker.slice(0, 6));
@@ -78,7 +78,7 @@ async function gather(company, news) {
       const cik = await D.secCik(company.ticker);
       if (!cik) throw new Error('SEC CIK를 찾지 못함');
       const [f, fl] = await Promise.all([D.secFinancials(cik.cik), D.secFilings(cik.cik)]);
-      if (f) { fin = { annual: f.annual, latest: null }; shares = f.shares; } else errors.push('SEC: 미국 회계 기준 재무 데이터 없음 (해외 상장사일 수 있음)');
+      if (f) { fin = { annual: f.annual, latest: null }; shares = f.shares; sharesNote = f.sharesNote || ''; if (!shares && sharesNote) errors.push(`시가총액: ${sharesNote}`); } else errors.push('SEC: 미국 회계 기준 재무 데이터 없음 (해외 상장사일 수 있음)');
       filings = fl; out.profile = { name: cik.title };
       out.source = 'SEC';
     } catch (e) { errors.push(`SEC: ${e.message}`); }
@@ -102,7 +102,7 @@ async function gather(company, news) {
   const p = out.price;
   if (p && shares) {
     const cap = p.close * shares * (m === 'KR' ? 1 : 1);
-    push('시가총액 (간이)', money(cap, m), cap);
+    push(sharesNote ? `시가총액 (간이, ${sharesNote})` : '시가총액 (간이)', money(cap, m), cap);
     if (a && a.ni > 0) push('PER (간이, 최근 연간 순이익)', `${r1(cap / a.ni)}배`, r1(cap / a.ni));
     // 최근 4분기 순이익 = 작년 연간 + 올해 누적 − 작년 같은 기간 누적 (이익이 급변할 때 연간 PER보다 현재에 가까움)
     if (a && l && a.year === l.year - 1 && [a.ni, l.ni, l.niPrev].every((x) => typeof x === 'number')) {
@@ -232,6 +232,11 @@ module.exports = async (req, res) => {
       return sendJson(res, 200, { ok: true, rank: sel.rank, pick: sel.pick, recent: sel.recent, universe: D.UNIVERSE.map((c) => ({ ticker: c.ticker, name: c.name, market: c.market })) });
     }
     if (!demoGate(req, res, 'heavy')) return;
+    if (url.searchParams.get('retry') === '1') {
+      // 7시 자동 실행이 실패한 날만 다시 만듦 (크론)
+      const skip = await retrySkip({ sheet: '기업 분석', field: '카드 JSON', cutoffMin: 10 * 60 });
+      if (skip) return sendJson(res, 200, { ok: true, skipped: skip });
+    }
     let body = {};
     if (req.method === 'POST') { try { body = await readBody(req); } catch (e) { body = {}; } }
     const result = await buildCard({ ticker: body.ticker || url.searchParams.get('ticker'), auto: !body.ticker, save: who === 'admin' });

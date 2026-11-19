@@ -3,7 +3,7 @@
 // GET  /api/industry?part=1     아침 자동화용: 만들고 저장한 뒤 메일용 HTML도 돌려줌
 // 교차검증: AI가 단 출처 번호가 실제 기사인지, 이슈에 적은 관련 기업이 그 기사에 실제로 나오는지 확인
 
-const { NEED_PASS, sendJson, isAuthorized, demoGate, callGemini, sheetPost, sheetRows, parseJsonLoose, kstDate } = require('./_lib');
+const { NEED_PASS, sendJson, isAuthorized, demoGate, callGemini, sheetPost, sheetRows, parseJsonLoose, kstDate, retrySkip } = require('./_lib');
 const { fetchNews } = require('./_data');
 const { krSectors } = require('./sectors');
 
@@ -123,6 +123,11 @@ module.exports = async (req, res) => {
   if (!who) return sendJson(res, 401, { ok: false, error: NEED_PASS });
   if (!demoGate(req, res, 'heavy')) return;
   const url = new URL(req.url, 'http://x');
+  if (url.searchParams.get('retry') === '1') {
+    // 7시 자동 실행이 실패한 날만 다시 만듦 (크론)
+    const skip = await retrySkip({ sheet: '산업 이슈', field: '이슈 JSON', cutoffMin: 10 * 60 });
+    if (skip) return sendJson(res, 200, { ok: true, skipped: skip });
+  }
   try {
     const data = await build({ save: who === 'admin' });
     const out = { ok: true, data };
