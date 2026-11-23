@@ -58,7 +58,7 @@ const CLOSE_PROMPT = `너는 한국 증권사 리서치센터의 시니어 매�
 놓친 요인마다 끝에 (판단) 또는 (정보)를 붙인다.
 - (판단): [아침에 이미 있던 정보] 목록에 그 요인이 있었는데 결론에 넣지 않았거나 가볍게 본 경우
 - (정보): 그 목록 어디에도 없고 장중에 새로 나온 뉴스인 경우
-'몰랐다'·'장중 새 뉴스'·'장 전에 알기 어려웠다'고 쓰기 전에 반드시 [아침에 이미 있던 정보]를 확인한다. 목록에 있으면 (판단)이다.
+'몰랐다'·'장중 새 뉴스'·'장 전에 알기 어려웠다'고 쓰기 전에 반드시 [아침에 이미 있던 정보]를 한 줄씩 확인한다. 같은 사건을 다른 말로 쓴 것도 같은 정보다(예: 증안펀드 = 증권시장안정펀드, 엔비디아 호실적 = 엔비디아 매출 급증). 목록에 있으면 (판단)이다.
 ## 놓친 이유: 판단 | 정보 | 둘 다 | 없음 중 하나
 위 표시를 모아 한 단어로 (놓친 것이 없으면 없음)
 ## 왜 갈렸나
@@ -119,10 +119,11 @@ ${body.conclusionText || '(비어 있음)'}`,
 
   const close = body.mode === 'close';
   if (close && body.actualText) parts.push({ text: `\n[실제 데이터 (대시보드 수집, 날짜는 종가 기준일)]\n${String(body.actualText).slice(0, 2000)}` });
-  if (close) parts.push({ text: `\n[아침에 이미 있던 정보 (한국장 시작 전에 시트에 저장된 것만)]\n${await morningContext(body.date)}` });
+  const morning = close ? await morningContext(body.date) : '';
+  if (close) parts.push({ text: `\n[아침에 이미 있던 정보 (한국장 시작 전에 시트에 저장된 것만)]\n${morning}` });
   const r = await callGemini({ system: close ? CLOSE_PROMPT : SYSTEM_PROMPT, parts, temperature: 0.3 });
   if (!r.ok) return sendJson(res, r.status, { ok: false, error: r.error });
-  return sendJson(res, 200, { ok: true, model: r.model, text: r.text });
+  return sendJson(res, 200, Object.assign({ ok: true, model: r.model, text: r.text }, close ? { morningContext: morning } : {}));
 };
 
 // 생성시각 "2026. 11. 19. 10시 33분 15초" → 한국시간 분
