@@ -104,6 +104,7 @@
     d.__cmp = state.cmpText || '';
     d.__close = state.closeText || '';
     d.__closeMatch = state.closeMatch || '';
+    d.__closeMiss = state.closeMiss || '';
     d.__mode = state.authorMode || '';
     d.__debate = state.debate || null;
     d.__snap = state.briefSnap || '';
@@ -1489,6 +1490,8 @@
         state.closeText = j.text;
         const mm = /한국장 판단\s*[:：]\s*(맞음|부분|틀림)/.exec(j.text);
         state.closeMatch = mm ? mm[1] : '';
+        const mw = /놓친 이유\s*[:：]\s*(판단|정보|둘 다|없음)/.exec(j.text);
+        state.closeMiss = mw ? mw[1] : '';
       } else {
         state.cmpText = j.text;
         const mm = /일치도\s*[:：]\s*(부분 일치|불일치|일치)/.exec(j.text);
@@ -1726,6 +1729,9 @@
     const warnDays = recs.filter((r) => r['한국 데이터 경고']).length;
     const closeRs = recs.map((r) => r['장 마감 복기 결과']).filter(Boolean);
     const closeHit = closeRs.filter((x) => x === '맞음').length, closePart = closeRs.filter((x) => x === '부분').length;
+    // AI가 놓친 이유: 판단(아침 정보가 있었는데 뺌) vs 정보(정말 없었음)
+    const missRs = recs.map((r) => r['장 마감 놓친 이유']).filter((x) => x && x !== '없음');
+    const missJ = missRs.filter((x) => x === '판단' || x === '둘 다').length, missI = missRs.filter((x) => x === '정보' || x === '둘 다').length;
 
     // 2) 판단·국면·증권사 일치도별 AI 적중률
     const hitBy = (keyFn) => {
@@ -1760,6 +1766,8 @@
           <div class="ins-s">${days ? `${days}일 동안 AI 문장 속 숫자 ${ok + bad}개 대조 · 틀린 날 ${badDays}일` : '대조 기록이 쌓이면 나와요'} <span class="muted">(${ACC_FROM.slice(5).replace('-', '/')} 이후, 대조 방식 개선 뒤)</span></div></div>
         <div class="ins"><div class="ins-l">AI 한국장 당일 판단</div><div class="ins-v">${closeRs.length ? pctS(closeHit + closePart * 0.5, closeRs.length) : '–'}</div>
           <div class="ins-s">${closeRs.length ? `장 마감 복기 ${closeRs.length}일 · 맞음 ${closeHit} · 부분 ${closePart} · 틀림 ${closeRs.length - closeHit - closePart} (부분은 절반으로 계산)` : '장 마감 복기를 하면 쌓여요'}</div></div>
+        <div class="ins"><div class="ins-l">AI가 놓친 이유</div><div class="ins-v">${missRs.length ? `판단 ${missJ} <small>·</small> 정보 ${missI}` : '–'}</div>
+          <div class="ins-s">${missRs.length ? `장 마감 복기에서 놓친 게 있던 ${missRs.length}일 · 판단 = 아침 자료에 있었는데 결론에서 뺌, 정보 = 장중에 새로 나옴` : '장 마감 복기를 하면 쌓여요 (아침 자료에 있었는데 뺐는지, 정말 몰랐는지)'}</div></div>
         <div class="ins"><div class="ins-l">한국 데이터 지연 감지</div><div class="ins-v">${warnDays}일</div>
           <div class="ins-s">AI가 오래된 한국 데이터를 볼 뻔한 날 (경고를 붙여 단정하지 않게 함)</div></div>
         ${strong ? `<div class="ins"><div class="ins-l">가장 뚜렷한 미국 → 한국 전이</div><div class="ins-v">${T.base.down}% <small>→</small> ${strong.down}%</div>
@@ -2003,6 +2011,7 @@
     rec['AI 리포트 비교'] = state.cmpText || '';
     rec['장 마감 복기'] = state.closeText || '';
     rec['장 마감 복기 결과'] = state.closeMatch || '';
+    rec['장 마감 놓친 이유'] = state.closeMiss || '';
     rec['작성 방식'] = authorMode();
     const AC = state.aiConcl;
     rec['AI 결론 JSON'] = AC ? JSON.stringify(AC) : '';
@@ -2199,6 +2208,7 @@
     state.cmpText = draft.__cmp || '';
     state.closeText = draft.__close || '';
     state.closeMatch = draft.__closeMatch || '';
+    state.closeMiss = draft.__closeMiss || '';
     state.authorMode = draft.__mode || '';
     state.debate = draft.__debate || null;
     state.debateRun = {};

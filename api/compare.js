@@ -3,7 +3,7 @@
 // mode: 'close' → 장 마감 복기 (아침 결론을 국내 마감 리포트·실제 종가와 맞춰 봄)
 // 필요한 환경변수: GEMINI_API_KEY, GEMINI_MODEL(선택)
 
-const { sendJson, checkPasscode, demoGate, readBody, callGemini } = require('./_lib');
+const { sendJson, checkPasscode, demoGate, readBody, callGemini, sheetRows } = require('./_lib');
 
 const SYSTEM_PROMPT = `너는 한국 증권사 리서치센터의 시니어 매크로 애널리스트다.
 대시보드가 만든 오늘의 매크로 결론(AI 센터장 결론, 사용자 결론이 있으면 함께)을 같은 날 증권사 시황·매크로 리포트와 교차검증한다.
@@ -55,8 +55,14 @@ const CLOSE_PROMPT = `너는 한국 증권사 리서치센터의 시니어 매�
 리포트 기준 동인·수급·주도 업종
 ## 아침 결론에서 맞은 것
 ## 틀린 것·놓친 것
+놓친 요인마다 끝에 (판단) 또는 (정보)를 붙인다.
+- (판단): [아침에 이미 있던 정보] 목록에 그 요인이 있었는데 결론에 넣지 않았거나 가볍게 본 경우
+- (정보): 그 목록 어디에도 없고 장중에 새로 나온 뉴스인 경우
+'몰랐다'·'장중 새 뉴스'·'장 전에 알기 어려웠다'고 쓰기 전에 반드시 [아침에 이미 있던 정보]를 확인한다. 목록에 있으면 (판단)이다.
+## 놓친 이유: 판단 | 정보 | 둘 다 | 없음 중 하나
+위 표시를 모아 한 단어로 (놓친 것이 없으면 없음)
 ## 왜 갈렸나
-데이터 시점(오래된 데이터), 장중 새 뉴스, 수급, 규칙 기반 해석의 한계 등 중에서 근거와 함께
+데이터 시점(오래된 데이터), 장중 새 뉴스, 판단(아침 정보의 경중을 잘못 잼), 수급, 규칙 기반 해석의 한계 등 중에서 근거와 함께
 ## 다음에 볼 것
 비슷한 날 아침에 먼저 확인할 것 1~2개
 아침 결론이 비어 있으면 "오늘 한국장 실제"만 쓰고 나머지는 "복기할 아침 결론이 없습니다"라고 쓴다.
@@ -113,7 +119,37 @@ ${body.conclusionText || '(비어 있음)'}`,
 
   const close = body.mode === 'close';
   if (close && body.actualText) parts.push({ text: `\n[실제 데이터 (대시보드 수집, 날짜는 종가 기준일)]\n${String(body.actualText).slice(0, 2000)}` });
+  if (close) parts.push({ text: `\n[아침에 이미 있던 정보 (한국장 시작 전에 시트에 저장된 것만)]\n${await morningContext(body.date)}` });
   const r = await callGemini({ system: close ? CLOSE_PROMPT : SYSTEM_PROMPT, parts, temperature: 0.3 });
   if (!r.ok) return sendJson(res, r.status, { ok: false, error: r.error });
   return sendJson(res, 200, { ok: true, model: r.model, text: r.text });
 };
+
+// 생성시각 "2026. 11. 19. 10시 33분 15초" → 한국시간 분
+function kstMin(t) { const m = /(\d+)시\s*(\d+)분/.exec(String(t || '')); return m ? +m[1] * 60 + +m[2] : null; }
+// 그날 아침(한국장 시작 전)에 이미 있던 정보: 자동 브리핑의 BULL·BEAR 근거, 산업 이슈 제목.
+// 장 시작(09:00) 뒤에 만든 줄은 '아침 정보'가 아니므로 뺀다.
+async function morningContext(date, open = 9 * 60) {
+  if (!date) return '(날짜 없음)';
+  const pick = (rows) => rows.find((r) => String(r['날짜'] || '').slice(0, 10) === date);
+  const early = (r) => { const m = kstMin(r && r['생성시각']); return m != null && m < open; };
+  const [auto, ind] = await Promise.all([sheetRows('자동 브리핑', 5).catch(() => []), sheetRows('산업 이슈', 5).catch(() => [])]);
+  const out = [];
+  const a = pick(auto);
+  if (a && early(a)) {
+    let d = null; try { d = JSON.parse(a['토론 JSON'] || 'null'); } catch (e) { d = null; }
+    if (a['한 줄 요약']) out.push(`- 아침 헤드라인: ${a['한 줄 요약']}`);
+    const side = (k, n) => { const x = d && d.open && d.open[k]; if (!x) return; out.push(`- ${n} 근거: ${[x.claim, ...(x.points || [])].filter(Boolean).join(' / ')}`); if (x.korea) out.push(`- ${n} 한국 견해: ${x.korea}`); };
+    side('bull', 'BULL'); side('bear', 'BEAR');
+  } else if (a) out.push('- (아침 AI 브리핑은 장 시작 뒤에 만들어져 아침 정보로 보지 않음)');
+  const i = pick(ind);
+  if (i && early(i)) {
+    let d = null; try { d = JSON.parse(i['이슈 JSON'] || 'null'); } catch (e) { d = null; }
+    const titles = ((d && d.issues) || []).map((x) => `${x.industry || x.sector || ''}: ${x.title || ''}`).filter((x) => x.length > 2);
+    if (i['한 줄 요약']) out.push(`- 산업 이슈 요약: ${i['한 줄 요약']}`);
+    titles.forEach((t) => out.push(`- 산업 이슈: ${t}`));
+  } else if (i) out.push('- (산업 이슈는 장 시작 뒤에 만들어져 아침 정보로 보지 않음)');
+  return out.length ? out.join('\n').slice(0, 3000) : '(시트에 저장된 아침 정보 없음)';
+}
+module.exports.morningContext = morningContext;
+module.exports.kstMin = kstMin;
